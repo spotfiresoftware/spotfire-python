@@ -1,0 +1,87 @@
+﻿\! filetype=Spotfire.DataFormat.Text; version=2.0;
+\*****************************************************************************
+\* This is an STDF file constructed by hand to contain all data types,
+\* for testing reading/writing SBDF files.
+\* The format was determined from: http://stn.spotfire.com/stn/Extend/STDF.aspx
+\* Hopefully, we can read this into Spotfire, and write it out as an SBDF file.
+\*****************************************************************************
+\* Table meta-data values: all types
+\* TMDBinary value: as.raw(0:3)
+\* note: stdf reader doesn't accept NA value for table meta data
+\*****************************************************************************
+\! property=TMDBinary; category=Table; type=Binary; value=\#AAECAw==;
+\! property=TMDBoolean; category=Table; type=Bool; value=True;
+\! property=TMDDate; category=Table; type=Date; value=2004-08-05;
+\! property=TMDDateTime; category=Table; type=DateTime; value=2005-09-01 13:31:42;
+\! property=TMDDecimal; category=Table; type=Decimal; value=101.45;
+\! property=TMDDouble; category=Table; type=Double; value=102.36;
+\! property=TMDFloat; category=Table; type=Float; value=103.27;
+\! property=TMDInteger; category=Table; type=Int; value=104;
+\! property=TMDLong; category=Table; type=Long; value=105;
+\! property=TMDString; category=Table; type=String; value=Tmd01;
+\! property=TMDTime; category=Table; type=Time; value=15:12:34;
+\! property=TMDTimeSpan; category=Table; type=TimeSpan; value=01:02:03.456;
+\*****************************************************************************
+\* Column meta-data, all types
+\* note: after reading into spotfire, and writing out as sbdf,
+\*       all the column meta-data names were lower-cased.
+\*       fixed by editing the name bytes in the sbdf file
+\* note: Spotfire reader for stdf seems to drop CMDBinary
+\*       for all columns except the first one.
+\*****************************************************************************
+\! property=CMDBinary; category=Column; type=Binary;
+\! property=CMDBoolean; category=Column; type=Bool;
+\! property=CMDDate; category=Column; type=Date;
+\! property=CMDDateTime; category=Column; type=DateTime;
+\! property=CMDDecimal; category=Column; type=Decimal;
+\! property=CMDDouble; category=Column; type=Double;
+\! property=CMDFloat; category=Column; type=Float;
+\! property=CMDInteger; category=Column; type=Int;
+\! property=CMDLong; category=Column; type=Long;
+\! property=CMDString; category=Column; type=String;
+\! property=CMDTime; category=Column; type=Time;
+\! property=CMDTimeSpan; category=Column; type=TimeSpan;
+\! property=Name; category=Column; type=String;
+\! property=DataType; category=Column; type=String;
+\*****************************************************************************
+\* Column meta-data values
+\*   CMDBinary values: for x in 1:12, as.raw(c(x, 1:3))
+\*****************************************************************************
+\#AQECAw==;\#AgECAw==;\#AwECAw==;\#BAECAw==;\#BQECAw==;\#BgECAw==;\#BwECAw==;\#CAECAw==;\#CQECAw==;\#CgECAw==;\#CwECAw==;\#DAECAw==;\?;
+True;False;True;False;True;False;True;False;True;False;True;False;\?;
+2001-01-01;2002-02-02;2003-03-03;2004-04-04;2005-05-05;2006-06-06;2007-07-07;2008-08-08;2009-09-09;2010-10-10;2011-11-11;2012-12-12;\?;
+2001-01-01 01:01:01;2002-02-02 02:02:02;2003-03-03 03:03:03;2004-04-04 04:04:04;2005-05-05 05:05:05;2006-06-06 06:06:06;2007-07-07 07:07:07;2008-08-08 08:08:08;2009-09-09 09:09:09;2010-10-10 10:10:10;2011-11-11 11:11:11;2012-12-12 12:12:12;\?;
+101.01;102.02;103.03;104.04;105.05;106.06;107.07;108.08;109.09;110.10;111.11;112.12;\?;
+1001.101;1002.102;1003.103;1004.104;1005.105;1006.106;1007.107;1008.108;1009.109;1010.110;1011.111;1012.112;\?;
+2001.101;2002.102;2003.103;2004.104;2005.105;2006.106;2007.107;2008.108;2009.109;2010.110;2011.111;2012.112;\?;
+3001;3002;3003;3004;3005;3006;3007;3008;3009;3010;3011;3012;\?;
+4001;4002;4003;4004;4005;4006;4007;4008;4009;4010;4011;4012;\?;
+Cmd01;Cmd02;Cmd03;Cmd04;Cmd05;Cmd06;Cmd07;Cmd08;Cmd09;Cmd10;Cmd11;Cmd12;\?;
+01:01:01;02:02:02;03:03:03;04:04:04;05:05:05;06:06:06;07:07:07;08:08:08;09:09:09;10:10:10;11:11:11;12:12:12;\?;
+01:01:01.001;02:02:02.002;03:03:03.003;04:04:04.004;05:05:05.005;06:06:06.006;07:07:07.007;08:08:08.008;09:09:09.009;10:10:10.010;11:11:11.011;12:12:12.012;\?;
+\*****************************************************************************
+\* column names and types.
+\* ColumnCMTNA is a simple int column whose column meta-data vals are all NA
+\*   Spotfire stdf reader seems to read these NA values as 0 or min value for the type, rather than NA.
+\*****************************************************************************
+ColumnBinary;ColumnBoolean;ColumnDate;ColumnDateTime;ColumnDecimal;ColumnDouble;ColumnFloat;ColumnInteger;ColumnLong;ColumnString;ColumnTime;ColumnTimeSpan;ColumnCMTNA;
+Binary;Boolean;Date;DateTime;Decimal;Double;Float;Integer;Long;String;Time;TimeSpan;Integer;
+\*****************************************************************************
+\* column data (first column binary is as.raw(c(99,1:3))
+\* all rows contain the same column values as the first row,
+\* except that we try NA for all column values in order,
+\* and last column has different value for each row.
+\*****************************************************************************
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;204;205;Data01;01:02:03;04:05:06.789;9001;
+\?;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;204;205;Data01;01:02:03;04:05:06.789;9002;
+\#YwECAw==;\?;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;204;205;Data01;01:02:03;04:05:06.789;9003;
+\#YwECAw==;True;\?;2004-05-06 07:08:09;201.23;202.456;203.789;204;205;Data01;01:02:03;04:05:06.789;9004;
+\#YwECAw==;True;2001-02-03;\?;201.23;202.456;203.789;204;205;Data01;01:02:03;04:05:06.789;9005;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;\?;202.456;203.789;204;205;Data01;01:02:03;04:05:06.789;9006;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;\?;203.789;204;205;Data01;01:02:03;04:05:06.789;9007;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;\?;204;205;Data01;01:02:03;04:05:06.789;9008;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;\?;205;Data01;01:02:03;04:05:06.789;9009;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;204;\?;Data01;01:02:03;04:05:06.789;9010;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;204;205;\?;01:02:03;04:05:06.789;9011;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;204;205;Data01;\?;04:05:06.789;9012;
+\#YwECAw==;True;2001-02-03;2004-05-06 07:08:09;201.23;202.456;203.789;204;205;Data01;01:02:03;\?;9013;
