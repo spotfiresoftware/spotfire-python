@@ -31,7 +31,7 @@ setup(
     author='TIBCO Software Inc.',
     maintainer='Spotfire Python Package Support',
     maintainer_email='spotfirepython@tibco.com',
-    url='http://spotfire.tibco.com/',
+    url='https://github.com/TIBCOSoftware/spotfire-python',
     license='BSD 3-Clause License',
     license_file='LICENSE',
     packages=find_packages(exclude=['spotfire.test']),
