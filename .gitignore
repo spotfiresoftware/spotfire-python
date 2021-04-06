@@ -1,0 +1,18 @@
+# byte-compiled files
+__pycache__/
+*.py[cod]
+
+# distribution
+/build/
+/dist/
+/*.egg-info/
+/MANIFEST
+
+# PyCharm project files
+/.idea
+
+# generic file backups and other detritus
+*~
+*.swp
+*.DS_Store
+

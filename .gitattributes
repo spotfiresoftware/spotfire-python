@@ -1,0 +1,6 @@
+# Set default behavior to automatically normalize line endings.
+* text=auto
+
+# Set specific files to have Unix line endings on Windows checkouts.
+run-tests.sh eol=lf
+
