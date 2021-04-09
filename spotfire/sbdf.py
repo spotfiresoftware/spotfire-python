@@ -1468,12 +1468,12 @@ if gpd is not None:
         table_metadata["MapChart.IsGeocodingTable"] = True
         if not table_metadata.get("MapChart.IsGeocodingEnabled"):
             table_metadata["MapChart.IsGeocodingEnabled"] = True
-        if all([isinstance(x, shapely.geometry.Point) for x in geom_series]):
+        if all(isinstance(x, shapely.geometry.Point) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Point"
-        elif all([isinstance(x, shapely.geometry.LineString) for x in geom_series]) or \
-                all([isinstance(x, shapely.geometry.LinearRing) for x in geom_series]):
+        elif all(isinstance(x, shapely.geometry.LineString) for x in geom_series) or \
+                all(isinstance(x, shapely.geometry.LinearRing) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Line"
-        elif all([isinstance(x, shapely.geometry.Polygon) for x in geom_series]):
+        elif all(isinstance(x, shapely.geometry.Polygon) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Polygon"
         else:
             raise SBDFError("cannot convert collections of Shapely objects")

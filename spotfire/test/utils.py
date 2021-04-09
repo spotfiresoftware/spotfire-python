@@ -2,6 +2,7 @@
 
 
 import sys
+import xml.dom.minidom
 import xmlrunner
 
 
@@ -11,10 +12,9 @@ class PythonVersionModifiedResult(xmlrunner.result._XMLTestResult):  # pylint: d
 
     def generate_reports(self, test_runner):
         """Generate reports."""
-        from xml.dom.minidom import Document
         all_results = self._get_info_by_testcase()
 
-        doc = Document()
+        doc = xml.dom.minidom.Document()
         testsuite = doc.createElement('testsuites')
         doc.appendChild(testsuite)
         parent_element = testsuite
