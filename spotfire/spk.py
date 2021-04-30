@@ -359,9 +359,9 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         _message("%s" % spotfire.__path__[0])
         if "spotfire.zip" in spotfire.__path__[0]:
             # Handle getting the requirements.txt from a zip file.
-            zfile = zipfile.ZipFile(os.path.split(spotfire.__path__[0])[0])
-            deny_requirements = zfile.open("spotfire/requirements.txt").readlines()
-            deny_list = [line.decode("utf-8").rstrip('\n') for line in deny_requirements]
+            with zipfile.ZipFile(os.path.split(spotfire.__path__[0])[0]) as zfile:
+                deny_requirements = zfile.open("spotfire/requirements.txt").readlines()
+                deny_list = [line.decode("utf-8").rstrip('\n') for line in deny_requirements]
         else:
             # Handle getting the requirements.txt directly from the file system.
             deny_requirements = open(os.path.join(spotfire.__path__[0], "requirements.txt")).readlines()

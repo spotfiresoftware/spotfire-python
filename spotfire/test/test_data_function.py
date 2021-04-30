@@ -4,14 +4,13 @@ import re
 import os
 import os.path
 import sys
-import tempfile
 import unittest
 import warnings
 
 import pandas as pd
 import pandas.testing as pdtest
 
-from spotfire import sbdf, data_function as datafn
+from spotfire import sbdf, data_function as datafn, _utils
 
 
 class DataFunctionTest(unittest.TestCase):
@@ -20,88 +19,83 @@ class DataFunctionTest(unittest.TestCase):
     def _run_analytic(self, script, inputs, outputs, success, expected_result):
         """Run a full pass through the analytic protocol, and compare the output to the expected value."""
         # pylint: disable=protected-access,too-many-locals
-        temp_files = []
-        input_spec = []
-        for k in inputs:
-            if inputs[k] is None:
-                in_type = "NULL"
-                print("test: missing input '%s' " % k)
-                input_spec.append(datafn.AnalyticInput(k, in_type, None))
-                continue
-            if isinstance(inputs[k], pd.DataFrame):
-                in_type = "table"
-            else:
-                try:
-                    in_type = "value" if len(inputs[k]) == 1 else "column"
-                except TypeError:
-                    in_type = "value"
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".sbdf")
-            tmp.close()
-            temp_files.append(tmp)
-            sbdf.export_data(inputs[k], tmp.name, k)
-            print("test: writing input %s '%s' to file '%s'" % (in_type, k, tmp.name))
-            input_spec.append(datafn.AnalyticInput(k, in_type, tmp.name))
-        output_spec = []
-        for k in outputs:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".sbdf")
-            tmp.close()
-            temp_files.append(tmp)
-            output_spec.append(datafn.AnalyticOutput(k, tmp.name))
-        spec = datafn.AnalyticSpec("script", input_spec, output_spec, script)
-        # spec.enable_debug()
-        print("test: created analytic spec")
-        print(repr(spec))
-
-        print("test: evaluating spec")
-        actual_result = spec.evaluate()
-        if actual_result._debug_log:
-            print(actual_result._debug_log)
-        actual_result._debug_log = None
-        actual_result_str = actual_result.summary
-        if actual_result_str:
-            print("test: --- start actual result ---")
-            print(actual_result_str)
-            print("test: --- end actual result ---")
-        if callable(expected_result):
-            expected = expected_result()
-        else:
-            expected = expected_result
-        if expected:
-            print("test: --- start expected result ---")
-            print(expected)
-            print("test: --- end expected result ---")
-        self.assertEqual(re.sub(", line \\d+,", ",", expected), re.sub(", line \\d+,", ",", actual_result_str))
-        if not actual_result.success:
-            print("test: data function has failed")
-        self.assertEqual(actual_result.success, success)
-        print("test: done evaluating spec")
-
-        for output in output_spec:
-            print("test: reading output variable '%s' from file '%s'" % (output.name, output.file))
-            if os.path.isfile(output.file):
-                try:
-                    data_frame = sbdf.import_data(output.file)
-                    print(data_frame)
-                    pdtest.assert_frame_equal(outputs[output.name], data_frame)
+        with _utils.TempFiles() as temp_files:
+            input_spec = []
+            for k in inputs:
+                if inputs[k] is None:
+                    in_type = "NULL"
+                    print("test: missing input '%s' " % k)
+                    input_spec.append(datafn.AnalyticInput(k, in_type, None))
+                    continue
+                if isinstance(inputs[k], pd.DataFrame):
+                    in_type = "table"
+                else:
                     try:
-                        print("test: table metadata:\n%r" % data_frame.spotfire_table_metadata)
-                    except AttributeError:
-                        pass
-                    for col in data_frame.columns:
+                        in_type = "value" if len(inputs[k]) == 1 else "column"
+                    except TypeError:
+                        in_type = "value"
+                tmp = temp_files.new_file(suffix=".sbdf")
+                tmp.close()
+                sbdf.export_data(inputs[k], tmp.name, k)
+                print("test: writing input %s '%s' to file '%s'" % (in_type, k, tmp.name))
+                input_spec.append(datafn.AnalyticInput(k, in_type, tmp.name))
+            output_spec = []
+            for k in outputs:
+                tmp = temp_files.new_file(suffix=".sbdf")
+                tmp.close()
+                output_spec.append(datafn.AnalyticOutput(k, tmp.name))
+            spec = datafn.AnalyticSpec("script", input_spec, output_spec, script)
+            # spec.enable_debug()
+            print("test: created analytic spec")
+            print(repr(spec))
+
+            print("test: evaluating spec")
+            actual_result = spec.evaluate()
+            if actual_result._debug_log:
+                print(actual_result._debug_log)
+            actual_result._debug_log = None
+            actual_result_str = actual_result.summary
+            if actual_result_str:
+                print("test: --- start actual result ---")
+                print(actual_result_str)
+                print("test: --- end actual result ---")
+            if callable(expected_result):
+                expected = expected_result()
+            else:
+                expected = expected_result
+            if expected:
+                print("test: --- start expected result ---")
+                print(expected)
+                print("test: --- end expected result ---")
+            self.assertEqual(re.sub(", line \\d+,", ",", expected), re.sub(", line \\d+,", ",", actual_result_str))
+            if not actual_result.success:
+                print("test: data function has failed")
+            self.assertEqual(actual_result.success, success)
+            print("test: done evaluating spec")
+
+            for output in output_spec:
+                print("test: reading output variable '%s' from file '%s'" % (output.name, output.file))
+                if os.path.isfile(output.file):
+                    try:
+                        data_frame = sbdf.import_data(output.file)
+                        print(data_frame)
+                        pdtest.assert_frame_equal(outputs[output.name], data_frame)
                         try:
-                            print("test: column '%s' metadata:\n%r" % (col, data_frame[col].spotfire_column_metadata))
+                            print("test: table metadata:\n%r" % data_frame.spotfire_table_metadata)
                         except AttributeError:
                             pass
-                    self._assert_table_metadata_equal(outputs[output.name], data_frame)
-                except AssertionError:
-                    raise
-                except BaseException:
-                    print("\nWARNING: outputs did not match\n")
-            else:
-                print("test: file doesn't exist")
-
-        for tmp in temp_files:
-            os.unlink(tmp.name)
+                        for col in data_frame.columns:
+                            try:
+                                print("test: column '%s' metadata:\n%r" % (col, data_frame[col].spotfire_column_metadata))
+                            except AttributeError:
+                                pass
+                        self._assert_table_metadata_equal(outputs[output.name], data_frame)
+                    except AssertionError:
+                        raise
+                    except BaseException:
+                        print("\nWARNING: outputs did not match\n")
+                else:
+                    print("test: file doesn't exist")
 
     def _assert_table_metadata_equal(self, first, second, msg=None):
         """Test that two data frames have the same metadata."""

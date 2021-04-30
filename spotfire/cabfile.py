@@ -9,8 +9,8 @@ import sys
 if sys.platform == "win32":
     import msilib
     import os
-    import tempfile
     import typing
+    from spotfire import _utils
 
     class CabFile:
         """Class with methods to open, write, and close Microsoft cabinet files."""
@@ -21,7 +21,7 @@ if sys.platform == "win32":
             """
             self.filename = file
             self._contents = []
-            self._temp_files = []
+            self._temp_files = _utils.TempFiles()
             self._opened = True
 
         def __enter__(self):
@@ -63,16 +63,14 @@ if sys.platform == "win32":
                 raise ValueError("Attempt to write to cabinet that was already closed")
 
             # write the data out to a temp file
-            temp = tempfile.NamedTemporaryFile(delete=False)
+            temp = self._temp_files.new_file()
             temp.file.write(data)
             temp.close()
-            self._temp_files.append(temp)
             self._contents.append((temp.name, arcname))
 
         def close(self) -> None:
             """Close the cabinet and write the contents to disk."""
             if self._opened:
                 msilib.FCICreate(self.filename, self._contents)
-                for temp in self._temp_files:
-                    os.unlink(temp.name)
+                self._temp_files.cleanup()
                 self._opened = False
