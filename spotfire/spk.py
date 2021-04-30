@@ -721,8 +721,7 @@ def python(args, hook=None) -> None:
     else:
         prefix = "root/python"
     package_builder.scan_python_installation(prefix)
-    if not analyst:
-        package_builder.scan_spotfire_package(prefix)
+    package_builder.scan_spotfire_package(prefix)
     spotfire_requirements = os.path.join(spotfire.__path__[0], "requirements.txt")
     try:
         cleanup, _ = package_builder.scan_requirements_txt(spotfire_requirements, prefix)
