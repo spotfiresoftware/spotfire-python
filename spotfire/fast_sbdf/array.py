@@ -124,11 +124,11 @@ def unpack_packed_array(
         # after sanitizing bounds-exceeding values, we can return as a Pandas object
         return pd.to_datetime(np_datetime)
     if array.array_type == ValueTypeId.DATE:
-        return unpack_packed_array(
+        return unpack_packed_array(  # type: ignore
             PackedPlainArray(array.array_bytes, ValueTypeId.DATETIME, array.n)
         ).date
     if array.array_type == ValueTypeId.TIME:
-        return unpack_packed_array(
+        return unpack_packed_array(  # type: ignore
             PackedPlainArray(array.array_bytes, ValueTypeId.DATETIME, array.n)
         ).time
     if array.array_type == ValueTypeId.TIMESPAN:

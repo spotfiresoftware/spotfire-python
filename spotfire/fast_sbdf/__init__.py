@@ -159,7 +159,7 @@ def import_data(  # noqa: C901
     for col_name in col_name_iter:
         chunks = tuple(ts.pop(col_name) for ts in table_slices)
         array_type = type(chunks[0]) if len(chunks) > 0 else PackedPlainArray
-        packed_full_columns[col_name] = array_type.concatenate(chunks)
+        packed_full_columns[col_name] = array_type.concatenate(chunks)  # type: ignore
         packed_missing_masks[col_name] = PackedBitArray.concatenate(
             tuple(
                 tsn.pop(col_name, PackedBitArray.empty(n))
