@@ -155,12 +155,12 @@ def unpack_packed_array(
         )
         if width == 0:
             return np.empty(array.n, "V0")
-        return data.view(f"V{width}")
+        return data.astype(np.uint8).view(f"V{width}")
     if array.array_type == ValueTypeId.DECIMAL:
         return np.array(
             [
                 _ValueType._to_python_decimal(array.array_bytes[i : i + 16])
-                for i in range(0, array.n, 16)
+                for i in range(0, len(array.array_bytes), 16)
             ]
         )
     if array.array_type == ValueTypeId.INTERNAL_BYTE:

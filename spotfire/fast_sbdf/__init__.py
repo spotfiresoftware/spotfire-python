@@ -215,7 +215,10 @@ def import_data(  # noqa: C901
         if missing_mask.any():
             col_array = pandas_data[col_name]
             missing_value = (
-                None if col_type in (ValueTypeId.BINARY, ValueTypeId.STRING) else np.nan
+                None
+                if col_type
+                in (ValueTypeId.BINARY, ValueTypeId.DECIMAL, ValueTypeId.STRING)
+                else np.nan
             )
             needs_copy = (
                 not col_array.flags.writeable if hasattr(col_array, "flags") else False
