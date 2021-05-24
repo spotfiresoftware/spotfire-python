@@ -5,31 +5,43 @@ TODOS:
 * Support _ValueArrayEncodingId.RUN_LENGTH array type
 * Contemplate making an SBDF writer
 """
+from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, List, Tuple, Union
+from typing import Any, BinaryIO, Dict, Hashable, List, Tuple, Union, cast
 
 import numpy as np
 import pandas as pd
-from pandas.api.types import union_categoricals
 
-from .array import _next_bytes_as_array
-from .base import SectionTypeId, ValueTypeId, _next_bytes_as_int, _next_bytes_as_str
-from .metadata import Metadatum, _next_bytes_as_column_metadata, _next_bytes_as_metadata
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
+
+
+from .array import (
+    PackedBitArray,
+    PackedPlainArray,
+    next_bytes_as_packed_array,
+    unpack_bit_array,
+    unpack_packed_array,
+)
+from .base import SectionTypeId, ValueTypeId, next_bytes_as_int, next_bytes_as_str
+from .metadata import Metadatum, next_bytes_as_column_metadata, next_bytes_as_metadata
 
 
 def _next_bytes_as_section_id(file: BinaryIO) -> int:
     """Reads section type id from file."""
-    magic_number = _next_bytes_as_int(file)
+    magic_number = next_bytes_as_int(file)
     if magic_number != 0xDF:
         raise ValueError("Section magic number 1 not found")
-    magic_number = _next_bytes_as_int(file)
+    magic_number = next_bytes_as_int(file)
     if magic_number != 0x5B:
         raise ValueError("Section magic number 2 not found")
-    section_id = _next_bytes_as_int(file)
+    section_id = next_bytes_as_int(file)
     return section_id
 
 
-def import_data(
+def read_file(  # noqa: C901
     sbdf_file: Union[str, Path],
     strings_as_categories: bool = False,
     skip_strings: bool = False,
@@ -37,16 +49,29 @@ def import_data(
 ) -> pd.DataFrame:
     """Import data from an SBDF file and create a pandas DataFrame.
 
-    :param sbdf_file: the file path of the SBDF file to import
-    :return: the DataFrame containing the imported data
+    TODO: document keyword arguments
     """
-    # open the SBDF file
-    with Path(sbdf_file).open("rb") as file:
+    # prevent edge cases for skip_strings option
+    if skip_strings and strings_as_categories:
+        raise ValueError("Strings cannot be both skipped and treated as categories")
+
+    # establish a master context manager for the duration of reading the file
+    with ExitStack() as read_context:
+        # open the SBDF file, managing context using the master context
+        file = read_context.enter_context(Path(sbdf_file).open("rb"))
+
+        # if we have tqdm, create and add progress bar managed by master read context
+        pbar = None
+        if tqdm is not None:
+            pbar = read_context.enter_context(
+                tqdm(desc="Reading File", unit="row", disable=not progress_bar)
+            )
+
         # read file header
         section_id = _next_bytes_as_section_id(file)
         assert section_id == SectionTypeId.FILEHEADER
-        version_major = _next_bytes_as_int(file)
-        version_minor = _next_bytes_as_int(file)
+        version_major = next_bytes_as_int(file)
+        version_minor = next_bytes_as_int(file)
         if (version_major, version_minor) != (1, 0):
             v = f"{version_major}.{version_minor}"
             msg = f"Only version 1.0 supported, but version {v} encountered."
@@ -56,72 +81,145 @@ def import_data(
         section_id = _next_bytes_as_section_id(file)
         assert section_id == SectionTypeId.TABLEMETADATA
         table_metadata = {  # noqa F841
-            md.name: md.value for md in _next_bytes_as_metadata(file)
+            md.name: md.value for md in next_bytes_as_metadata(file)
         }
         # TODO: parse table metadata into a form that can be returned
 
         # read column metadata
-        n_columns = _next_bytes_as_int(file, n_bytes=4)
-        column_metadata_fields: Tuple[Metadatum, ...] = _next_bytes_as_metadata(
+        n_columns = next_bytes_as_int(file, n_bytes=4)
+        column_metadata_fields: Tuple[Metadatum, ...] = next_bytes_as_metadata(
             file, skip_values=True
         )
         column_metadatas: Tuple[Dict[str, Any], ...] = tuple(
             {
                 md.name: md.value
-                for md in _next_bytes_as_column_metadata(file, column_metadata_fields)
+                for md in next_bytes_as_column_metadata(file, column_metadata_fields)
             }
             for _ in range(n_columns)
         )
         # TODO: parse column metadata into a form that can be returned
 
-        column_names = tuple(md_dict["Name"] for md_dict in column_metadatas)
+        column_names: Tuple[Hashable, ...] = tuple(
+            md_dict["Name"] for md_dict in column_metadatas
+        )
         column_types = tuple(
             ValueTypeId(md_dict["DataType"][0]) for md_dict in column_metadatas
         )
-        # read tables
-        pandas_data: List[List[np.ndarray]] = [[] for _ in range(n_columns)]
+
+        # read table content as arrays packed into bytes objects
+        rows_per_slice: List[int] = []
+        table_slices: List[Dict[Hashable, PackedPlainArray]] = []
+        table_slice_nulls: List[Dict[Hashable, PackedBitArray]] = []
         while True:
+            current_slice: Dict[Hashable, PackedPlainArray] = dict()
+            current_slice_nulls: Dict[Hashable, PackedBitArray] = dict()
             # read next table slice
             section_id = _next_bytes_as_section_id(file)
             if section_id == SectionTypeId.TABLEEND:
                 break
             if section_id != SectionTypeId.TABLESLICE:
-                raise ValueError(
-                    f"Expected table slice ID, got {section_id} instead"
-                )
-            slice_n_columns = _next_bytes_as_int(file, n_bytes=4)
+                raise ValueError(f"Expected table slice ID, got {section_id} instead")
+            slice_n_columns = next_bytes_as_int(file, n_bytes=4)
             assert slice_n_columns == n_columns
             # read each column slice in the table slice
-            for column_index, value_type in enumerate(column_types):
+            for column_name in column_names:
                 section_id = _next_bytes_as_section_id(file)
                 assert section_id == SectionTypeId.COLUMNSLICE
-                col_vals = _next_bytes_as_array(
-                    file,
-                    strings_as_categories=strings_as_categories,
-                    skip_strings=skip_strings,
-                )
+                col_vals = cast(PackedPlainArray, next_bytes_as_packed_array(file))
                 # handle column properties (ignoring all but IsInvalid)
-                n_properties = _next_bytes_as_int(file, n_bytes=4)
+                n_properties = next_bytes_as_int(file, n_bytes=4)
                 for _ in range(n_properties):
-                    property_name = _next_bytes_as_str(file)
-                    property_value = _next_bytes_as_array(file)
+                    property_name = next_bytes_as_str(file)
+                    property_value = cast(
+                        PackedBitArray, next_bytes_as_packed_array(file)
+                    )
                     # we only care about the "IsInvalid" property, which defines nulls
                     if property_name == "IsInvalid":
-                        invalid_mask = property_value.astype(np.bool_)
-                        # use Pandas to handle type changes (e.g. int to float)
-                        col_vals = pd.Series(col_vals)
-                        missing_value = (
-                            None if value_type == ValueTypeId.STRING else np.nan
-                        )
-                        col_vals.loc[invalid_mask] = missing_value
-                        col_vals = col_vals.values
-                pandas_data[column_index].append(col_vals)
+                        current_slice_nulls[column_name] = property_value
+                current_slice[column_name] = col_vals
+            n_row_in_slice = next(iter(current_slice.values())).n
+            rows_per_slice.append(n_row_in_slice)
+            if pbar is not None:
+                pbar.update(n_row_in_slice)
+            table_slices.append(current_slice)
+            table_slice_nulls.append(current_slice_nulls)
 
-        # concatenate column chunks
-        for i, value_type in enumerate(column_types):
-            if strings_as_categories and value_type == ValueTypeId.STRING:
-                pandas_data[i] = union_categoricals(pandas_data[i])
-            else:
-                pandas_data[i] = np.concatenate(pandas_data[i])
-        df = pd.DataFrame(dict(zip(column_names, pandas_data)), copy=False)
-        return df
+    # concatenate column slices and missing mask slices into single packed objects
+    col_name_iter = column_names
+    if tqdm is not None:
+        col_name_iter = tqdm(
+            col_name_iter,
+            desc="Concatenating Column Slice Data",
+            unit="col",
+            disable=not progress_bar,
+        )
+    packed_full_columns = {}
+    packed_missing_masks = {}
+    for col_name in col_name_iter:
+        packed_full_columns[col_name] = PackedPlainArray.concatenate(
+            tuple(ts.pop(col_name) for ts in table_slices)
+        )
+        packed_missing_masks[col_name] = PackedBitArray.concatenate(
+            tuple(
+                tsn.pop(col_name, PackedBitArray.empty(n))
+                for tsn, n in zip(table_slice_nulls, rows_per_slice)
+            )
+        )
+
+    # unpack columns from bytes objects into numpy arrays
+    col_name_type_iter = zip(column_names, column_types)
+    if tqdm is not None:
+        col_name_type_iter = tqdm(
+            col_name_type_iter,
+            desc="Unpacking Data",
+            unit="col",
+            disable=not progress_bar,
+            total=n_columns,
+        )
+    pandas_data = {}
+    for col_name, col_type in col_name_type_iter:
+        # skip strings if setting enabled
+        if skip_strings and col_type == ValueTypeId.STRING:
+            del packed_full_columns[col_name]
+            pandas_data[col_name] = pd.Categorical.from_codes(
+                codes=np.zeros(sum(rows_per_slice), dtype=np.uint8),
+                categories=["<SKIPPED>"],
+            )
+            continue
+
+        # unpack column to array otherwise
+        col_array = unpack_packed_array(
+            packed_full_columns.pop(col_name), strings_as_categories
+        )
+        pandas_data[col_name] = col_array
+
+    # unpack and apply missing masks
+    col_name_type_iter = zip(column_names, column_types)
+    if tqdm is not None:
+        col_name_type_iter = tqdm(
+            col_name_type_iter,
+            desc="Handling Missing Values",
+            unit="col",
+            disable=not progress_bar,
+            total=n_columns,
+        )
+    for col_name, col_type in col_name_type_iter:
+        missing_mask = unpack_bit_array(packed_missing_masks.pop(col_name))
+        if missing_mask.any():
+            col_array = pandas_data[col_name]
+            missing_value = (
+                None if col_type in (ValueTypeId.BINARY, ValueTypeId.STRING) else np.nan
+            )
+            needs_copy = (
+                not col_array.flags.writeable if hasattr(col_array, "flags") else False
+            )
+            # convert numpy-native binary array to Python object array for nullability
+            dtype = "O" if col_type == ValueTypeId.BINARY else None
+            col_array = pd.Series(col_array, copy=needs_copy, dtype=dtype)
+            col_array.loc[missing_mask] = missing_value
+            col_array = col_array.values
+            pandas_data[col_name] = col_array
+
+    # create dataframe and return
+    df = pd.DataFrame(pandas_data)
+    return df

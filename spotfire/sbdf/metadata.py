@@ -5,9 +5,9 @@ from typing import Any, BinaryIO, NamedTuple, Optional, Tuple
 from .base import (
     DATETIME_EPOCH,
     ValueTypeId,
-    _next_bytes_as_binary,
-    _next_bytes_as_int,
-    _next_bytes_as_str,
+    next_bytes_as_binary,
+    next_bytes_as_int,
+    next_bytes_as_str,
 )
 
 
@@ -45,9 +45,9 @@ def _next_bytes_as_value(file: BinaryIO, value_type: ValueTypeId) -> Any:
         ms = _next_bytes_as_value(file, ValueTypeId.LONG)
         return datetime.timedelta(milliseconds=ms)
     if value_type == ValueTypeId.STRING:
-        return _next_bytes_as_str(file)
+        return next_bytes_as_str(file)
     if value_type == ValueTypeId.BINARY:
-        return _next_bytes_as_binary(file)
+        return next_bytes_as_binary(file)
     if value_type == ValueTypeId.DECIMAL:
         # not implemented
         pass
@@ -57,36 +57,36 @@ def _next_bytes_as_value(file: BinaryIO, value_type: ValueTypeId) -> Any:
     raise NotImplementedError(f"Reading value type {value_type} not yet implemented.")
 
 
-def _next_bytes_as_metadata(
+def next_bytes_as_metadata(
     file: BinaryIO, skip_values: bool = False
 ) -> Tuple[Metadatum, ...]:
     """Reads a metadata file section."""
-    n_metadata = _next_bytes_as_int(file, 4)
+    n_metadata = next_bytes_as_int(file, 4)
     assert n_metadata >= 0
     table_metadata = []
     for _ in range(n_metadata):
-        name = _next_bytes_as_str(file)
-        value_type = ValueTypeId(_next_bytes_as_int(file))
+        name = next_bytes_as_str(file)
+        value_type = ValueTypeId(next_bytes_as_int(file))
         value = None
         if not skip_values:
-            is_value_present = bool(_next_bytes_as_int(file))
+            is_value_present = bool(next_bytes_as_int(file))
             if is_value_present:
                 value = _next_bytes_as_value(file, value_type)
         default_value = None
-        is_default_value_present = bool(_next_bytes_as_int(file))
+        is_default_value_present = bool(next_bytes_as_int(file))
         if is_default_value_present:
             default_value = _next_bytes_as_value(file, value_type)
         table_metadata.append(Metadatum(name, value_type, value, default_value))
     return tuple(table_metadata)
 
 
-def _next_bytes_as_column_metadata(
+def next_bytes_as_column_metadata(
     file: BinaryIO, metadata_for_fields: Tuple[Metadatum, ...]
 ) -> Tuple[Metadatum, ...]:
     """Reads a column metadata section."""
     column_metadata = []
     for field_meta in metadata_for_fields:
-        is_value_present = _next_bytes_as_int(file)
+        is_value_present = next_bytes_as_int(file)
         if is_value_present:
             value = _next_bytes_as_value(file, field_meta.value_type)
             md = Metadatum(

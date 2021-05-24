@@ -4,13 +4,16 @@ from enum import IntEnum
 from typing import BinaryIO
 
 import numpy as np
+import pandas as pd
 
 DATETIME_EPOCH = datetime.datetime(1, 1, 1)
 DATETIME_EPOCH_NUMPY = np.datetime64(DATETIME_EPOCH, "ms")
+PANDAS_MIN_DATETIME = np.datetime64(np.datetime64(pd.Timestamp.min, "ms"))
+PANDAS_MAX_DATETIME = np.datetime64(np.datetime64(pd.Timestamp.max, "ms"))
 DECIMAL_EXPONENT_BIAS = 12320
 
 
-def _next_bytes_as_int(file: BinaryIO, n_bytes=1) -> int:
+def next_bytes_as_int(file: BinaryIO, n_bytes=1) -> int:
     """Reads next bytes of data from file as an int8 or int32."""
     if n_bytes == 1:
         return struct.unpack("B", file.read(n_bytes))[0]
@@ -19,16 +22,16 @@ def _next_bytes_as_int(file: BinaryIO, n_bytes=1) -> int:
     raise ValueError("Only 1 or 4 bytes understood.")
 
 
-def _next_bytes_as_binary(file: BinaryIO) -> bytes:
+def next_bytes_as_binary(file: BinaryIO) -> bytes:
     """Reads next 4 bytes as bytecount int32, then reads that number of bytes."""
-    n_bytes = _next_bytes_as_int(file, n_bytes=4)
+    n_bytes = next_bytes_as_int(file, n_bytes=4)
     assert n_bytes >= 0
     return file.read(n_bytes)
 
 
-def _next_bytes_as_str(file: BinaryIO) -> str:
+def next_bytes_as_str(file: BinaryIO) -> str:
     """Reads next bytes as binary, then decodes to UTF string."""
-    return _next_bytes_as_binary(file).decode()
+    return next_bytes_as_binary(file).decode()
 
 
 class SectionTypeId(IntEnum):
@@ -67,3 +70,16 @@ class ValueArrayEncodingId(IntEnum):
     PLAIN_ARRAY = 0x1
     RUN_LENGTH = 0x2
     BIT_ARRAY = 0x3
+
+
+N_BYTES_OF_FIXED_SIZE_VALUE_TYPE = {
+    ValueTypeId.BOOL: 1,
+    ValueTypeId.INT: 4,
+    ValueTypeId.LONG: 8,
+    ValueTypeId.FLOAT: 4,
+    ValueTypeId.DOUBLE: 8,
+    ValueTypeId.DATETIME: 8,
+    ValueTypeId.DATE: 8,
+    ValueTypeId.TIME: 8,
+    ValueTypeId.TIMESPAN: 8,
+}
