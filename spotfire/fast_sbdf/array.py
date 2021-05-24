@@ -1,4 +1,3 @@
-from struct import pack
 from typing import BinaryIO, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
@@ -56,6 +55,13 @@ class PackedBitArray(NamedTuple):
         read_mask = np.ones(8 * n_bytes, dtype=np.bool_)
         read_mask[n_bits:] = False
         return cls(array_bytes, read_mask)
+
+    @property
+    def n(self):
+        return self.read_mask.sum()
+
+
+PackedArray = Union[PackedBitArray, PackedPlainArray]
 
 
 def next_bytes_as_packed_array(

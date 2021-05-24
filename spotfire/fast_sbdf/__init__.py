@@ -19,6 +19,7 @@ except ImportError:
 
 
 from .array import (
+    PackedArray,
     PackedBitArray,
     PackedPlainArray,
     next_bytes_as_packed_array,
@@ -108,10 +109,10 @@ def import_data(  # noqa: C901
 
         # read table content as arrays packed into bytes objects
         rows_per_slice: List[int] = []
-        table_slices: List[Dict[Hashable, PackedPlainArray]] = []
+        table_slices: List[Dict[Hashable, PackedArray]] = []
         table_slice_nulls: List[Dict[Hashable, PackedBitArray]] = []
         while True:
-            current_slice: Dict[Hashable, PackedPlainArray] = dict()
+            current_slice: Dict[Hashable, PackedArray] = dict()
             current_slice_nulls: Dict[Hashable, PackedBitArray] = dict()
             # read next table slice
             section_id = _next_bytes_as_section_id(file)
@@ -125,7 +126,7 @@ def import_data(  # noqa: C901
             for column_name in column_names:
                 section_id = _next_bytes_as_section_id(file)
                 assert section_id == SectionTypeId.COLUMNSLICE
-                col_vals = cast(PackedPlainArray, next_bytes_as_packed_array(file))
+                col_vals = next_bytes_as_packed_array(file)
                 # handle column properties (ignoring all but IsInvalid)
                 n_properties = next_bytes_as_int(file, n_bytes=4)
                 for _ in range(n_properties):
@@ -156,9 +157,9 @@ def import_data(  # noqa: C901
     packed_full_columns = {}
     packed_missing_masks = {}
     for col_name in col_name_iter:
-        packed_full_columns[col_name] = PackedPlainArray.concatenate(
-            tuple(ts.pop(col_name) for ts in table_slices)
-        )
+        chunks = tuple(ts.pop(col_name) for ts in table_slices)
+        array_type = type(chunks[0]) if len(chunks) > 0 else PackedPlainArray
+        packed_full_columns[col_name] = array_type.concatenate(chunks)
         packed_missing_masks[col_name] = PackedBitArray.concatenate(
             tuple(
                 tsn.pop(col_name, PackedBitArray.empty(n))
@@ -186,11 +187,17 @@ def import_data(  # noqa: C901
                 categories=["<SKIPPED>"],
             )
             continue
-
         # unpack column to array otherwise
-        col_array = unpack_packed_array(
-            packed_full_columns.pop(col_name), strings_as_categories
-        )
+        packed = packed_full_columns.pop(col_name)
+        if isinstance(packed, PackedPlainArray):
+            col_array = unpack_packed_array(packed, strings_as_categories)
+        elif isinstance(packed, PackedBitArray):
+            col_array = unpack_bit_array(packed)
+        else:
+            raise RuntimeError(
+                "Unable to parse file correctly, we thought we had a packed "
+                "array, but we didn't!"
+            )
         pandas_data[col_name] = col_array
 
     # unpack and apply missing masks
