@@ -7,4 +7,4 @@ pytz
 setuptools
 six
 wheel
-#numba>=0.52.0 ### not required, but highly recommended
+numba>=0.52.0
