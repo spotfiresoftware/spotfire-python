@@ -1,3 +1,4 @@
+from struct import pack
 from typing import BinaryIO, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
@@ -26,6 +27,8 @@ class PackedPlainArray(NamedTuple):
 
     @classmethod
     def concatenate(cls, packed_arrays: Sequence["PackedPlainArray"]):
+        if len(packed_arrays) == 0:
+            return cls(b"", ValueTypeId.BOOL, 0)
         first_type = packed_arrays[0].array_type
         if not all(a.array_type == first_type for a in packed_arrays):
             raise ValueError("Not all packed arrays have same array_type.")
@@ -40,6 +43,8 @@ class PackedBitArray(NamedTuple):
 
     @classmethod
     def concatenate(cls, packed_arrays: Sequence["PackedBitArray"]) -> "PackedBitArray":
+        if len(packed_arrays) == 0:
+            return cls(b"", np.array([], dtype=np.bool_))
         array_bytes = b"".join(a.array_bytes for a in packed_arrays)
         read_mask = np.concatenate(tuple(a.read_mask for a in packed_arrays))
         return cls(array_bytes, read_mask)

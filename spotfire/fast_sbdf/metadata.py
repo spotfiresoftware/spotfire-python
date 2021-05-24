@@ -6,6 +6,7 @@ from .base import (
     DATETIME_EPOCH,
     ValueTypeId,
     next_bytes_as_binary,
+    next_bytes_as_decimal,
     next_bytes_as_int,
     next_bytes_as_str,
 )
@@ -49,8 +50,7 @@ def _next_bytes_as_value(file: BinaryIO, value_type: ValueTypeId) -> Any:
     if value_type == ValueTypeId.BINARY:
         return next_bytes_as_binary(file)
     if value_type == ValueTypeId.DECIMAL:
-        # not implemented
-        pass
+        return next_bytes_as_decimal(file)
     if value_type == ValueTypeId.INTERNAL_BYTE:
         # not implemented
         pass

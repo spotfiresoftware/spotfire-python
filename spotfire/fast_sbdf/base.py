@@ -1,10 +1,13 @@
 import datetime
+import decimal
 import struct
 from enum import IntEnum
 from typing import BinaryIO
 
 import numpy as np
 import pandas as pd
+
+from spotfire.sbdf import _ValueType
 
 DATETIME_EPOCH = datetime.datetime(1, 1, 1)
 DATETIME_EPOCH_NUMPY = np.datetime64(DATETIME_EPOCH, "ms")
@@ -32,6 +35,11 @@ def next_bytes_as_binary(file: BinaryIO) -> bytes:
 def next_bytes_as_str(file: BinaryIO) -> str:
     """Reads next bytes as binary, then decodes to UTF string."""
     return next_bytes_as_binary(file).decode()
+
+
+def next_bytes_as_decimal(file: BinaryIO) -> decimal.Decimal:
+    bytes = file.read(N_BYTES_OF_FIXED_SIZE_VALUE_TYPE[ValueTypeId.DECIMAL])
+    return _ValueType._to_python_decimal(bytes)
 
 
 class SectionTypeId(IntEnum):
@@ -82,4 +90,5 @@ N_BYTES_OF_FIXED_SIZE_VALUE_TYPE = {
     ValueTypeId.DATE: 8,
     ValueTypeId.TIME: 8,
     ValueTypeId.TIMESPAN: 8,
+    ValueTypeId.DECIMAL: 16,
 }
