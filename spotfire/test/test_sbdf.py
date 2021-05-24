@@ -4,10 +4,34 @@ import datetime
 import decimal
 import os
 import unittest
+from time import perf_counter
 
 import pandas
 
-import spotfire.sbdf as sbdf
+from spotfire import fast_sbdf, sbdf
+
+
+def fast_slow_parity(filename):
+    start = perf_counter()
+    slow_df = sbdf.import_data(filename)
+    mid = perf_counter()
+    fast_df = fast_sbdf.import_data(filename)
+    end = perf_counter()
+    t1 = mid - start
+    t2 = end - mid
+    print(f"Slow read took {t1:.4f}s, fast read took {t2:.4f}s")
+    with pandas.option_context("display.max_columns", 30, "display.expand_frame_repr", False):
+        print(slow_df.head(15))
+        print(fast_df.head(15))
+        print(slow_df.dtypes)
+        print(fast_df.dtypes)
+        print()
+        print()
+        print(slow_df.eq(fast_df).all())
+    assert t2 < t1
+    equality_by_column = slow_df.eq(fast_df).all()
+    assert equality_by_column.all()
+    return slow_df
 
 
 class SbdfTest(unittest.TestCase):
@@ -15,7 +39,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_0(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/0.sbdf" % os.path.dirname(__file__))
+        dataframe = fast_slow_parity("%s/files/sbdf/0.sbdf" % os.path.dirname(__file__))
         self.assertEqual(dataframe.shape, (0, 12))
 
         def verify(dict_, pre, post):
@@ -51,7 +75,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_1(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/1.sbdf" % os.path.dirname(__file__))
+        dataframe = fast_slow_parity("%s/files/sbdf/1.sbdf" % os.path.dirname(__file__))
         self.assertEqual(dataframe.shape, (1, 12))
         self.assertEqual(dataframe.at[0, "Boolean"], False)
         self.assertEqual(dataframe.at[0, "Integer"], 69)
@@ -67,7 +91,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_100(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/100.sbdf" % os.path.dirname(__file__))
+        dataframe = fast_slow_parity("%s/files/sbdf/100.sbdf" % os.path.dirname(__file__))
         self.assertEqual(dataframe.shape, (100, 12))
         self.assertEqual(dataframe.get("Boolean")[0:6].tolist(), [False, True, None, False, True, None])
         self.assertEqual(dataframe.get("Integer")[0:6].dropna().tolist(), [69.0, 73.0, 75.0, 79.0])
@@ -85,7 +109,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_10001(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/10001.sbdf" % os.path.dirname(__file__))
+        dataframe = fast_slow_parity("%s/files/sbdf/10001.sbdf" % os.path.dirname(__file__))
         self.assertEqual(dataframe.shape, (10001, 12))
         # Check the values in the first row
         self.assertEqual(dataframe.at[0, "Boolean"], False)
