@@ -41,7 +41,7 @@ def _next_bytes_as_section_id(file: BinaryIO) -> int:
     return section_id
 
 
-def read_file(  # noqa: C901
+def import_data(  # noqa: C901
     sbdf_file: Union[str, Path],
     strings_as_categories: bool = False,
     skip_strings: bool = False,
