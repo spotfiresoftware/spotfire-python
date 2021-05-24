@@ -12,7 +12,8 @@ import traceback
 import typing
 import re
 
-from spotfire import sbdf, _utils
+from spotfire import sbdf
+from spotfire import sbdf_orig, _utils
 
 
 def _bad_string(str_: typing.Any) -> bool:
@@ -146,7 +147,8 @@ class AnalyticOutput:
         :param debug_fn: logging function for debug messages
         """
         debug_fn("returning '%s' as file %s" % (self.name, self.file))
-        sbdf.export_data(globals_dict[self.name], self.file, default_column_name=self.name)
+        sbdf_orig.export_data(globals_dict[self.name], self.file, default_column_name=self.name)
+
 
 
 class AnalyticResult:
@@ -315,7 +317,7 @@ class AnalyticSpec:
                 continue
             try:
                 input_.read(self.globals, self.debug)
-            except sbdf.SBDFError as exc:
+            except sbdf_orig.SBDFError as exc:
                 self.debug("error reading input variable '%s' from file '%s': %s"
                            % (input_.name,
                               input_.file,
