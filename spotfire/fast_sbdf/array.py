@@ -17,6 +17,7 @@ from .base import (
     ValueTypeId,
     next_bytes_as_int,
 )
+from spotfire.sbdf import _ValueType
 
 
 class PackedPlainArray(NamedTuple):
@@ -156,8 +157,12 @@ def unpack_packed_array(
             return np.empty(array.n, "V0")
         return data.view(f"V{width}")
     if array.array_type == ValueTypeId.DECIMAL:
-        # not implemented
-        pass
+        return np.array(
+            [
+                _ValueType._to_python_decimal(array.array_bytes[i : i + 16])
+                for i in range(0, array.n, 16)
+            ]
+        )
     if array.array_type == ValueTypeId.INTERNAL_BYTE:
         # not implemented
         pass
