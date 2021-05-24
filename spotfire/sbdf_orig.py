@@ -1,10 +1,13 @@
+# Copyright © 2021. TIBCO Software Inc.
+# This file is subject to the license terms contained
+# in the license file that is distributed with this file.
+
 """Functions to import data tables into Python from SBDF files and export data from Python to SBDF files."""
 
 import collections.abc
 import datetime
 import decimal
 import enum
-import os
 import struct
 import tempfile
 import typing
@@ -1127,6 +1130,7 @@ class _ValueType:
     @staticmethod
     def _to_python_decimal(data: bytes) -> decimal.Decimal:
         bits = bitstring.BitArray(bytes=data)
+        # pylint: disable=unbalanced-tuple-unpacking
         coefficient, biased_exponent_bits_high, sign_bit, biased_exponent_bits_low = \
             bits.unpack('uintle:96,pad:17,bits:7,bool,bits:7')
         # un-bias the exponent
@@ -1464,12 +1468,12 @@ if gpd is not None:
         table_metadata["MapChart.IsGeocodingTable"] = True
         if not table_metadata.get("MapChart.IsGeocodingEnabled"):
             table_metadata["MapChart.IsGeocodingEnabled"] = True
-        if all([isinstance(x, shapely.geometry.Point) for x in geom_series]):
+        if all(isinstance(x, shapely.geometry.Point) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Point"
-        elif all([isinstance(x, shapely.geometry.LineString) for x in geom_series]) or \
-                all([isinstance(x, shapely.geometry.LinearRing) for x in geom_series]):
+        elif all(isinstance(x, shapely.geometry.LineString) for x in geom_series) or \
+                all(isinstance(x, shapely.geometry.LinearRing) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Line"
-        elif all([isinstance(x, shapely.geometry.Polygon) for x in geom_series]):
+        elif all(isinstance(x, shapely.geometry.Polygon) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Polygon"
         else:
             raise SBDFError("cannot convert collections of Shapely objects")
@@ -1502,28 +1506,23 @@ if gpd is not None:
 if matplotlib is not None:
     def _pyplot_to_binary(fig: matplotlib.figure.Figure) -> bytes:
         fig.set_canvas(matplotlib.pyplot.gcf().canvas)
-        file = tempfile.NamedTemporaryFile(delete=False)
-        fig.savefig(file)
-        file.close()
-        return _image_file_to_binary(file)
+        with tempfile.NamedTemporaryFile(suffix=".png") as file:
+            fig.savefig(file, format="png")
+            return _image_file_to_binary(file)
 
 if seaborn is not None:
     def _seaborn_plot_to_binary(plot: seaborn.axisgrid.Grid) -> bytes:
-        file = tempfile.NamedTemporaryFile(delete=False)
-        plot.savefig(file)
-        file.close()
-        return _image_file_to_binary(file)
+        with tempfile.NamedTemporaryFile(suffix=".png") as file:
+            plot.savefig(file)
+            return _image_file_to_binary(file)
 
 if PIL is not None:
     def _pil_image_to_binary(img: PIL.Image.Image) -> bytes:
-        file = tempfile.NamedTemporaryFile(delete=False)
-        img.save(file, "png")
-        file.close()
-        return _image_file_to_binary(file)
+        with tempfile.NamedTemporaryFile(suffix=".png") as file:
+            img.save(file, "png")
+            return _image_file_to_binary(file)
 
 
 def _image_file_to_binary(file: tempfile.NamedTemporaryFile) -> bytes:
-    bits = bitstring.BitArray(filename=file.name)
-    img = bits.bytes
-    os.unlink(file.name)
-    return img
+    file.seek(0)
+    return file.read()
