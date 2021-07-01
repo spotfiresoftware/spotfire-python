@@ -150,13 +150,15 @@ def _import_table_slices(file: typing.BinaryIO, column_names: typing.List[str],
                 pd_data[column_names[i]].append(None if invalid else value)
 
 
-def export_data(obj: typing.Any, sbdf_file: typing.Union[str, bytes, int], default_column_name: str = "x") -> None:
+
+def export_data(obj: typing.Any, sbdf_file: typing.Union[str, bytes, int], default_column_name: str = "x", write_compressed: bool = True) -> None:
     """Export data to an SBDF file.
 
     :param obj: the data object to export
     :param sbdf_file: the filename to export the data to
     :param default_column_name: the column name to use when exporting data objects without intrinsic names (such as
                                 lists or scalar values)
+    :param write_compressed: default True. Set this to false to write uncompressed SBDF
     :raises SBDFError: if a problem is encountered during export
     """
     columns, column_names, column_types, table_metadata, column_metadata = _export_columnize_data(obj,
@@ -173,7 +175,7 @@ def export_data(obj: typing.Any, sbdf_file: typing.Union[str, bytes, int], defau
         tmeta.write(file)
 
         # Write out the table and column slices
-        _export_table_slices(columns, column_names, column_types, file, row_count, tmeta)
+        _export_table_slices(columns, column_names, column_types, file, row_count, tmeta, write_compressed)
 
 
 def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
@@ -302,7 +304,7 @@ def _export_column_metadata(columns: typing.Dict[str, typing.List], column_names
 
 def _export_table_slices(columns: typing.Dict[str, typing.List], column_names: typing.List[str],
                          column_types: typing.Dict[str, '_ValueTypeId'], file: typing.BinaryIO,
-                         row_count: int, tmeta: '_TableMetadata') -> None:
+                         row_count: int, tmeta: '_TableMetadata', write_compressed: bool) -> None:
     max_rows_per_slice = max(10, 100000 // max(1, len(column_names)))
     row_offset = 0
     while row_offset < row_count:
@@ -310,7 +312,11 @@ def _export_table_slices(columns: typing.Dict[str, typing.List], column_names: t
         tslice = _TableSlice(tmeta)
         for colname in column_names:
             obj = _SbdfObject(column_types.get(str(colname)), columns[colname][row_offset:row_offset + slice_row_count])
-            cslice = _ColumnSlice(_ValueArray(_ValueArrayEncoding.PLAIN_ARRAY, obj))
+            cslice = None
+            if write_compressed:
+                cslice = _ColumnSlice(_ValueArray(_ValueArrayEncoding.RUN_LENGTH, obj))
+            else:
+                cslice = _ColumnSlice(_ValueArray(_ValueArrayEncoding.PLAIN_ARRAY, obj))
             invalid = [pd.isnull(x) for x in obj.data]
             if any(invalid):
                 obj_vt = _ValueType(column_types.get(str(colname)))
@@ -740,9 +746,12 @@ class _SbdfObject:
             size = valtype.get_packed_size()
             if size is None:
                 raise SBDFError("unknown typeid")
-            for i in range(n):
-                valtype_bytes = valtype.to_bytes(self.data[i])
-                _write_bytes(file, valtype_bytes)
+            if valtype.type_id == _ValueTypeId.INTERNAL_BYTE:
+               _write_bytes(file, self.data)
+            else:
+                for i in range(n):
+                    valtype_bytes = valtype.to_bytes(self.data[i])
+                    _write_bytes(file, valtype_bytes)
 
     @classmethod
     def read_array(cls, file: typing.BinaryIO, valuetype: '_ValueType') -> '_SbdfObject':
@@ -823,7 +832,37 @@ class _ValueArray:
         self.obj1 = array
 
     def _create_rle(self, array: _SbdfObject) -> None:
-        raise NotImplementedError  # sbdf_va_create_rle
+        # RLE 
+        self.valuetype = array.valuetype
+        self.val1 = array.get_count();
+        occurrences = bytearray();
+        data = []
+        previousValue = None
+        occurrenceCount = 0
+        bFirstTimeThrough = True
+        for value in array.data:
+            if (pd.isnull(value)):
+                value = _ValueType(array.valuetype).missing_value()
+            if (bFirstTimeThrough) :
+                previousValue = value
+                bFirstTimeThrough = False
+            else:
+                # check for empties!
+                if value != previousValue or occurrenceCount >= 255:
+                    data.append(previousValue)
+                    occurrences.append(occurrenceCount)
+                    occurrenceCount = 0
+                else:
+                    occurrenceCount += 1
+                                    
+            previousValue = value
+                
+        # Capture the "last" value in the list
+        data.append(previousValue)
+        occurrences.append(occurrenceCount) 
+        self.obj1 = _SbdfObject(_ValueTypeId.INTERNAL_BYTE, bytes(occurrences))
+        self.obj2 = _SbdfObject(array.valuetype, data);        
+        
 
     def _create_bit(self, array: _SbdfObject) -> None:
         self.valuetype = _ValueTypeId.BOOL
@@ -855,7 +894,13 @@ class _ValueArray:
         raise SBDFError("unknown valuearray encoding")
 
     def _get_rle(self) -> _SbdfObject:
-        raise NotImplementedError  # sbdf_get_rle_values
+        data = []
+        for i in range(len(self.obj1.data)):
+            count = int.from_bytes(self.obj1.data[i], "big")
+            if (count is None): count = 0
+            for n in range(count + 1):
+                data.append(self.obj2.data[i])        
+        return _SbdfObject(self.valuetype, data)
 
     def _get_bit(self) -> _SbdfObject:
         obj = _SbdfObject(_ValueTypeId.BOOL, [])
@@ -963,7 +1008,8 @@ class _ValueTypeId(enum.IntEnum):
             _ValueTypeId.TIMESPAN: "TimeSpan",
             _ValueTypeId.STRING: "String",
             _ValueTypeId.BINARY: "Binary",
-            _ValueTypeId.DECIMAL: "Currency"
+            _ValueTypeId.DECIMAL: "Currency",
+            _ValueTypeId.INTERNAL_BYTE: "Integer"
         }.get(self, "unknown")
 
     def to_dtype_name(self) -> str:
@@ -1071,7 +1117,8 @@ class _ValueType:
             _ValueTypeId.TIMESPAN: 8,
             _ValueTypeId.STRING: 0,  # size is dynamic
             _ValueTypeId.BINARY: 0,  # size is dynamic
-            _ValueTypeId.DECIMAL: 16
+            _ValueTypeId.DECIMAL: 16,
+            _ValueTypeId.INTERNAL_BYTE: 1
         }.get(self.type_id, None)
 
     _DATETIME_EPOCH = datetime.datetime(1, 1, 1)
@@ -1126,6 +1173,10 @@ class _ValueType:
     @staticmethod
     def _to_python_binary(data: bytes) -> bytes:
         return data
+    
+    @staticmethod
+    def _to_python_internal_byte(data:bytes) -> int:
+        return struct.unpack(">c", data)[0]
 
     @staticmethod
     def _to_python_decimal(data: bytes) -> decimal.Decimal:
