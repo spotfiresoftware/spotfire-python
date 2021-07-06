@@ -6,7 +6,7 @@ $ python -m spotfire.test
 import unittest
 import xmlrunner
 
-import spotfire.test.utils as utils
+from spotfire.test import utils
 
 TEST_MODULES = ['spotfire.test.test_sbdf', 'spotfire.test.test_data_function']
 
