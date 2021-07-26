@@ -10,7 +10,7 @@ import sys
 if sys.platform == "win32":
     # pylint: disable=invalid-name,too-few-public-methods,attribute-defined-outside-init
     import ctypes
-    import ctypes.wintypes as wintypes
+    from ctypes import wintypes
     import os
     import typing
 

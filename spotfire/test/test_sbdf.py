@@ -33,7 +33,6 @@ def fast_slow_parity(filename):
     assert equality_by_column.all()
     return slow_df
 
-
 class SbdfTest(unittest.TestCase):
     """Unit tests for public functions in 'spotfire.sbdf' module."""
 
