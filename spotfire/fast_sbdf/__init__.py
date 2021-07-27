@@ -1,3 +1,5 @@
+# Contributions to SBDF reader functionality provided by PDF Solutions, Inc. (C) 2021
+
 """
 TODOS:
 * Return table/column metadata as well as the table data

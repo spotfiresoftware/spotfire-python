@@ -1,3 +1,5 @@
+# Contributions to SBDF reader functionality provided by PDF Solutions, Inc. (C) 2021
+
 from typing import BinaryIO, NamedTuple, Sequence, Tuple, Union
 
 import numpy as np
