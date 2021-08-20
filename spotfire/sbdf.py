@@ -13,9 +13,9 @@ import tempfile
 import typing
 import warnings
 
-import bitstring
 import pandas as pd
 import numpy as np
+import bitstring
 
 from spotfire import _utils
 
@@ -151,7 +151,11 @@ def _import_table_slices(file: typing.BinaryIO, column_names: typing.List[str],
 
 
 
-def export_data(obj: typing.Any, sbdf_file: typing.Union[str, bytes, int], default_column_name: str = "x", write_compressed: bool = True) -> None:
+def export_data(obj: typing.Any, \
+    sbdf_file: typing.Union[str, bytes, int], \
+    default_column_name: str = "x", \
+    write_compressed: bool = True) -> None:
+
     """Export data to an SBDF file.
 
     :param obj: the data object to export
@@ -747,7 +751,7 @@ class _SbdfObject:
             if size is None:
                 raise SBDFError("unknown typeid")
             if valtype.type_id == _ValueTypeId.INTERNAL_BYTE:
-               _write_bytes(file, self.data)
+                _write_bytes(file, self.data)
             else:
                 for i in range(n):
                     valtype_bytes = valtype.to_bytes(self.data[i])
@@ -832,37 +836,34 @@ class _ValueArray:
         self.obj1 = array
 
     def _create_rle(self, array: _SbdfObject) -> None:
-        # RLE 
+        # RLE
         self.valuetype = array.valuetype
-        self.val1 = array.get_count();
-        occurrences = bytearray();
+        self.val1 = array.get_count()
+        occurrences = bytearray()
         data = []
-        previousValue = None
-        occurrenceCount = 0
-        bFirstTimeThrough = True
+        previous_value = None
+        occurrence_count = 0
+        first_iteration = True
         for value in array.data:
-            if (pd.isnull(value)):
+            if pd.isnull(value):
                 value = _ValueType(array.valuetype).missing_value()
-            if (bFirstTimeThrough) :
-                previousValue = value
-                bFirstTimeThrough = False
+            if first_iteration:
+                previous_value = value
+                first_iteration = False
             else:
                 # check for empties!
-                if value != previousValue or occurrenceCount >= 255:
-                    data.append(previousValue)
-                    occurrences.append(occurrenceCount)
-                    occurrenceCount = 0
+                if value != previous_value or occurrence_count >= 255:
+                    data.append(previous_value)
+                    occurrences.append(occurrence_count)
+                    occurrence_count = 0
                 else:
-                    occurrenceCount += 1
-                                    
-            previousValue = value
-                
+                    occurrence_count += 1
+            previous_value = value
         # Capture the "last" value in the list
-        data.append(previousValue)
-        occurrences.append(occurrenceCount) 
+        data.append(previous_value)
+        occurrences.append(occurrence_count)
         self.obj1 = _SbdfObject(_ValueTypeId.INTERNAL_BYTE, bytes(occurrences))
-        self.obj2 = _SbdfObject(array.valuetype, data);        
-        
+        self.obj2 = _SbdfObject(array.valuetype, data)
 
     def _create_bit(self, array: _SbdfObject) -> None:
         self.valuetype = _ValueTypeId.BOOL
@@ -897,9 +898,10 @@ class _ValueArray:
         data = []
         for i in range(len(self.obj1.data)):
             count = int.from_bytes(self.obj1.data[i], "big")
-            if (count is None): count = 0
-            for n in range(count + 1):
-                data.append(self.obj2.data[i])        
+            if count is None:
+                count = 0
+            for _ in range(count + 1):
+                data.append(self.obj2.data[i])
         return _SbdfObject(self.valuetype, data)
 
     def _get_bit(self) -> _SbdfObject:
@@ -1173,9 +1175,9 @@ class _ValueType:
     @staticmethod
     def _to_python_binary(data: bytes) -> bytes:
         return data
-    
+
     @staticmethod
-    def _to_python_internal_byte(data:bytes) -> int:
+    def _to_python_internal_byte(data: bytes) -> int:
         return struct.unpack(">c", data)[0]
 
     @staticmethod

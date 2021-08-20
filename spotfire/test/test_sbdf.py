@@ -111,3 +111,66 @@ class SbdfTest(unittest.TestCase):
         self.assertTrue(pandas.isnull(dataframe.at[10000, "TimeSpan"]))
         self.assertEqual(dataframe.at[10000, "String"], "kiwis")
         self.assertEqual(dataframe.at[10000, "Binary"], b"\x7c\x7d\x7e\x7f")
+
+    def test_read_10001_compressed(self):
+        """Reading RLE encoded SBDF files should work."""
+        dataframe = sbdf.import_data("%s/files/sbdf/10001-compressed.sbdf" % os.path.dirname(__file__))
+        self.assertEqual(dataframe.shape, (10001, 12))
+        # Check the values in the first row
+        self.assertEqual(dataframe.at[0, "Boolean"], False)
+        self.assertEqual(dataframe.at[0, "Integer"], 69)
+        self.assertTrue(pandas.isnull(dataframe.at[0, "Long"]))
+        self.assertEqual(dataframe.at[0, "Float"], 12.)
+        self.assertEqual(dataframe.at[0, "Double"], 116.18)
+        self.assertTrue(pandas.isnull(dataframe.at[0, "DateTime"]))
+        self.assertEqual(dataframe.at[0, "Date"], datetime.date(1583, 1, 2))
+        self.assertEqual(dataframe.at[0, "Time"], datetime.time(0, 22, 20))
+        self.assertEqual(dataframe.at[0, "TimeSpan"], datetime.timedelta(0, 504, 300000))
+        self.assertEqual(dataframe.at[0, "String"], "The")
+        self.assertEqual(dataframe.at[0, "Binary"], None)
+        # Check the values in the last row
+        self.assertEqual(dataframe.at[10000, "Boolean"], True)
+        self.assertTrue(pandas.isnull(dataframe.at[10000, "Integer"]))
+        self.assertEqual(dataframe.at[10000, "Long"], 19118)
+        self.assertAlmostEqual(dataframe.at[10000, "Float"], 3042.33325195313)
+        self.assertAlmostEqual(dataframe.at[10000, "Double"], 28661.92)
+        self.assertEqual(dataframe.at[10000, "DateTime"], datetime.datetime(1583, 11, 1, 0, 0))
+        self.assertEqual(dataframe.at[10000, "Date"], datetime.date(1583, 11, 1))
+        self.assertEqual(dataframe.at[10000, "Time"], datetime.time(21, 25, 40))
+        self.assertTrue(pandas.isnull(dataframe.at[10000, "TimeSpan"]))
+        self.assertEqual(dataframe.at[10000, "String"], "kiwis")
+        self.assertEqual(dataframe.at[10000, "Binary"], b"\x7c\x7d\x7e\x7f")
+
+    def test_read_write_10001_compressed(self):
+        """Reading and writing RLE encoded SBDF files should work."""
+        importedDataframe = sbdf.import_data("%s/files/sbdf/10001-compressed.sbdf" % os.path.dirname(__file__))
+        self.assertEqual(importedDataframe.shape, (10001, 12))
+        sbdf.export_data(importedDataframe, "%s/files/sbdf/10001-compressed-written.sbdf" % os.path.dirname(__file__))
+        """Now reading back and checking compressed file"""
+        dataframe = sbdf.import_data("%s/files/sbdf/10001-compressed-written.sbdf" % os.path.dirname(__file__))
+        self.assertEqual(dataframe.shape, (10001, 12))
+        
+        # Check the values in the first row
+        self.assertEqual(dataframe.at[0, "Boolean"], False)
+        self.assertEqual(dataframe.at[0, "Integer"], 69)
+        self.assertTrue(pandas.isnull(dataframe.at[0, "Long"]))
+        self.assertEqual(dataframe.at[0, "Float"], 12.)
+        self.assertEqual(dataframe.at[0, "Double"], 116.18)
+        self.assertTrue(pandas.isnull(dataframe.at[0, "DateTime"]))
+        self.assertEqual(dataframe.at[0, "Date"], datetime.date(1583, 1, 2))
+        self.assertEqual(dataframe.at[0, "Time"], datetime.time(0, 22, 20))
+        self.assertEqual(dataframe.at[0, "TimeSpan"], datetime.timedelta(0, 504, 300000))
+        self.assertEqual(dataframe.at[0, "String"], "The")
+        self.assertEqual(dataframe.at[0, "Binary"], None)
+        # Check the values in the last row
+        self.assertEqual(dataframe.at[10000, "Boolean"], True)
+        self.assertTrue(pandas.isnull(dataframe.at[10000, "Integer"]))
+        self.assertEqual(dataframe.at[10000, "Long"], 19118)
+        self.assertAlmostEqual(dataframe.at[10000, "Float"], 3042.33325195313)
+        self.assertAlmostEqual(dataframe.at[10000, "Double"], 28661.92)
+        self.assertEqual(dataframe.at[10000, "DateTime"], datetime.datetime(1583, 11, 1, 0, 0))
+        self.assertEqual(dataframe.at[10000, "Date"], datetime.date(1583, 11, 1))
+        self.assertEqual(dataframe.at[10000, "Time"], datetime.time(21, 25, 40))
+        self.assertTrue(pandas.isnull(dataframe.at[10000, "TimeSpan"]))
+        self.assertEqual(dataframe.at[10000, "String"], "kiwis")
+        self.assertEqual(dataframe.at[10000, "Binary"], b"\x7c\x7d\x7e\x7f")
