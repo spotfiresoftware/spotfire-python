@@ -143,9 +143,9 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_write_10001_compressed(self):
         """Reading and writing RLE encoded SBDF files should work."""
-        importedDataframe = sbdf.import_data("%s/files/sbdf/10001-compressed.sbdf" % os.path.dirname(__file__))
-        self.assertEqual(importedDataframe.shape, (10001, 12))
-        sbdf.export_data(importedDataframe, "%s/files/sbdf/10001-compressed-written.sbdf" % os.path.dirname(__file__))
+        importeddataframe = sbdf.import_data("%s/files/sbdf/10001-compressed.sbdf" % os.path.dirname(__file__))
+        self.assertEqual(importeddataframe.shape, (10001, 12))
+        sbdf.export_data(importeddataframe, "%s/files/sbdf/10001-compressed-written.sbdf" % os.path.dirname(__file__))
         """Now reading back and checking compressed file"""
         dataframe = sbdf.import_data("%s/files/sbdf/10001-compressed-written.sbdf" % os.path.dirname(__file__))
         self.assertEqual(dataframe.shape, (10001, 12))
