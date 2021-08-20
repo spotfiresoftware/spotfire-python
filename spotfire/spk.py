@@ -354,17 +354,19 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :return:
         """
         # Disable Pylint `Too many nested blocks`
-        # pylint: disable=too-many-nested-blocks
+        # pylint: disable=too-many-nested-blocks,too-many-locals
         # Use the spotfire requirements file as a deny list.
         _message("%s" % spotfire.__path__[0])
         if "spotfire.zip" in spotfire.__path__[0]:
             # Handle getting the requirements.txt from a zip file.
             with zipfile.ZipFile(os.path.split(spotfire.__path__[0])[0]) as zfile:
-                deny_requirements = zfile.open("spotfire/requirements.txt").readlines()
+                with zfile.open("spotfire/requirements.txt") as deny_file:
+                    deny_requirements = deny_file.readlines()
                 deny_list = [line.decode("utf-8").rstrip('\n') for line in deny_requirements]
         else:
             # Handle getting the requirements.txt directly from the file system.
-            deny_requirements = open(os.path.join(spotfire.__path__[0], "requirements.txt")).readlines()
+            with open(os.path.join(spotfire.__path__[0], "requirements.txt")) as deny_file:
+                deny_requirements = deny_file.readlines()
             deny_list = [line.rstrip('\n') for line in deny_requirements]
 
         # Compile a Set of directories to delete
@@ -385,7 +387,8 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                         # Go through the RECORD file from the package dist-info and delete each listed file
                         record_file = os.path.join(root, directory_name, 'RECORD')
                         if os.path.isfile(record_file):
-                            record_files = open(record_file).readlines()
+                            with open(record_file) as open_record_file:
+                                record_files = open_record_file.readlines()
                             for file in record_files:
                                 # Clean up the path to each file.
                                 # RECORD has file name, then comma followed by info we don't need.

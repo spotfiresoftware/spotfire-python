@@ -7,7 +7,7 @@ import unittest
 
 import pandas
 
-import spotfire.sbdf as sbdf
+from spotfire import sbdf
 
 
 class SbdfTest(unittest.TestCase):
