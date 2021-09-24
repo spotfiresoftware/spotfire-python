@@ -1449,7 +1449,7 @@ if gpd is not None:
         # Convert to dataframe
         geom = [shapely.wkb.dumps(x) for x in gdf["geometry"]]
         geom_series = gdf["geometry"]
-        gdf = gdf.drop("geometry", 1)
+        gdf = gdf.drop(columns="geometry")
         names = gdf.keys()
         dframe = pd.DataFrame(gdf.to_numpy(), columns=names)
 
@@ -1478,10 +1478,7 @@ if gpd is not None:
         else:
             raise SBDFError("cannot convert collections of Shapely objects")
         if gdf.crs is not None:
-            if gdf.crs.startswith("+init="):
-                gdf.crs = gdf.crs[6:]
-            table_metadata["MapChart.GeographicCrs"] = gdf.crs
-
+            table_metadata["MapChart.GeographicCrs"] = gdf.crs.to_string()
         return dframe
 
 
@@ -1492,15 +1489,13 @@ if gpd is not None:
 
         # Convert to geodataframe
         geom = [shapely.wkb.loads(x) for x in dframe["Geometry"]]
-        dframe = dframe.drop("Geometry", 1)
+        dframe = dframe.drop(columns="Geometry")
         gdf = gpd.GeoDataFrame(dframe, geometry=geom)
 
         # Decide what CRS to use
         if "MapChart.GeographicCrs" in table_metadata.keys() and table_metadata["MapChart.GeographicCrs"] != "":
             proj = table_metadata["MapChart.GeographicCrs"][0]
-            if not proj.startswith("+init="):
-                proj = "+init=" + proj
-            gdf.crs = proj
+            gdf = gdf.set_crs(proj)
         return gdf
 
 if matplotlib is not None:

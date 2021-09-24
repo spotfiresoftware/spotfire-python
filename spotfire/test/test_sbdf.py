@@ -4,8 +4,10 @@ import datetime
 import decimal
 import os
 import unittest
+import tempfile
 
 import pandas
+import geopandas
 
 from spotfire import sbdf
 
@@ -111,3 +113,16 @@ class SbdfTest(unittest.TestCase):
         self.assertTrue(pandas.isnull(dataframe.at[10000, "TimeSpan"]))
         self.assertEqual(dataframe.at[10000, "String"], "kiwis")
         self.assertEqual(dataframe.at[10000, "Binary"], b"\x7c\x7d\x7e\x7f")
+
+    def test_read__write_geodata(self):
+        """Test that geo-encoded data is properly converted to/from GeoDataFrame"""
+        gdf = sbdf.import_data("%s/files/sbdf/NACountries.sbdf" % os.path.dirname(__file__))
+        self.assertIsInstance(gdf, pandas.DataFrame)
+        self.assertIsInstance(gdf, geopandas.GeoDataFrame)
+        self.assertEqual(gdf.crs.to_epsg(), 4326)
+        self.assertEqual(gdf.crs.to_string(), "EPSG:4326")
+        with tempfile.TemporaryDirectory() as tempdir:
+            sbdf.export_data(gdf, tempdir + "\\test.sbdf")
+            gdf2 = sbdf.import_data(tempdir + "\\test.sbdf")
+            self.assertEqual(gdf2.crs.to_epsg(), 4326)
+            self.assertEqual(gdf2.crs.to_string(), "EPSG:4326")
