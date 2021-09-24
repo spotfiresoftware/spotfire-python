@@ -20,6 +20,6 @@ def load_tests(loader, tests, pattern):  # pylint: disable=unused-argument
     return test_suite
 
 
-with open("results-%s.xml" % utils.PYTHON_VERSION, "wb") as output:
+with open(f"results-{utils.PYTHON_VERSION}.xml", "wb") as output:
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output=output, resultclass=utils.PythonVersionModifiedResult),
                   failfast=False, buffer=False, catchbreak=False, exit=False)

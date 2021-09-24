@@ -191,9 +191,9 @@ if sys.platform == "win32":
         try:
             # Sanity check arguments
             if not os.path.isfile(filename):
-                raise FileNotFoundError("No such file: '%s'" % filename)
+                raise FileNotFoundError(f"No such file: '{filename}'")
             if not os.path.isfile(certificate):
-                raise FileNotFoundError("No such file: '%s'" % certificate)
+                raise FileNotFoundError(f"No such file: '{certificate}'")
             if use_sha256 and not use_rfc3161:
                 raise Exception("SHA-256 timestamping requires the RFC 3161 timestamping protocol")
 
@@ -238,7 +238,7 @@ if sys.platform == "win32":
         if cert_store is None:
             cert_store = _pfx_import_cert_store(ctypes.byref(cert_blob), None, 0)
         if cert_store is None:
-            raise Exception("Could not load certificate; is the password correct? (0x%08x)" % ctypes.GetLastError())
+            raise Exception(f"Could not load certificate; is the password correct? (0x{ctypes.GetLastError():08x})")
         return cert_store
 
 
@@ -247,7 +247,7 @@ if sys.platform == "win32":
         cert_context = _cert_find_cert_in_store(cert_store, _X509_ASN_ENCODING | _PKCS_7_ASN_ENCODING, 0,
                                                 _CERT_FIND_ANY, None, None)
         if cert_context is None:
-            raise Exception("Could not get certificate from store (0x%08x)" % ctypes.GetLastError())
+            raise Exception(f"Could not get certificate from store (0x{ctypes.GetLastError():08x})")
         key_spec = wintypes.DWORD()
         found_private_key = False
         while not found_private_key:
@@ -260,7 +260,7 @@ if sys.platform == "win32":
                 cert_context = _cert_find_cert_in_store(cert_store, _X509_ASN_ENCODING | _PKCS_7_ASN_ENCODING, 0,
                                                         _CERT_FIND_ANY, None, cert_context)
                 if cert_context is None:
-                    raise Exception("Could not get certificate from store (0x%08x)" % ctypes.GetLastError())
+                    raise Exception(f"Could not get certificate from store (0x{ctypes.GetLastError():08x})")
         return cert_context
 
 
@@ -322,7 +322,7 @@ if sys.platform == "win32":
         if signer_context is not None:
             _signer_free_context(signer_context)
         if result is not _S_OK:
-            raise Exception("Could not sign file (0x%08x)" % ctypes.GetLastError())
+            raise Exception(f"Could not sign file (0x{ctypes.GetLastError():08x})")
 
 
     def _timestamp(signer_subject_info, timestamp, use_rfc3161, use_sha256):
@@ -342,4 +342,4 @@ if sys.platform == "win32":
             else:
                 result = _signer_timestamp(ctypes.byref(signer_subject_info), timestamp, None, None)
             if result is not _S_OK:
-                raise Exception("Could not timestamp file (0x%08x)" % ctypes.GetLastError())
+                raise Exception(f"Could not timestamp file (0x{ctypes.GetLastError():08x})")

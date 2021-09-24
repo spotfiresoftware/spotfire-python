@@ -101,7 +101,7 @@ class _SpkVersion:
         return "%d.%d.%d.%d" % tuple(self._versions)
 
     def __repr__(self):
-        return "%s.%s%r" % (self.__class__.__module__, self.__class__.__qualname__, tuple(self._versions))
+        return f"{self.__class__.__module__}.{self.__class__.__qualname__}{tuple(self._versions)!r}"
 
     def increment_major(self) -> None:
         """Increment the major component of the version number.  Resets all smaller components to zero."""
@@ -200,7 +200,7 @@ def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int
     # Now append the brand lines to what we just read in.
     brand_per_line = line_length - len(comment)
     while data_json:
-        lines.append("%s%s\n" % (comment, data_json[:brand_per_line]))
+        lines.append(f"{comment}{data_json[:brand_per_line]}\n")
         data_json = data_json[brand_per_line:]
 
     # Write out the new file.
@@ -257,7 +257,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             py_prefix = sys.base_prefix
         except AttributeError:
             py_prefix = getattr(sys, "real_prefix", sys.prefix)
-        _message("Scanning Python installation at %s for files to include." % py_prefix)
+        _message(f"Scanning Python installation at {py_prefix} for files to include.")
 
         # Scan all files in the running Python's prefix
         for root, _, filenames in os.walk(py_prefix):
@@ -317,7 +317,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             shutil.rmtree(tempdir)
 
         # Install the packages from the requirement file into tempdir.
-        _message("Installing pip packages from %s to temporary location." % requirements)
+        _message(f"Installing pip packages from {requirements} to temporary location.")
         try:
             pip_output = _tee([sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
                                "--target", tempdir, "--requirement", requirements])
@@ -343,7 +343,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     filename_payload = r"%s/%s" % (prefix, filename_relative)
                 else:
                     filename_payload = r"%s/%s/%s" % (prefix, self._site_packages_dirname, filename_relative)
-                if not filename_relative.startswith("bin%s" % os.path.sep):
+                if not filename_relative.startswith(f"bin{os.path.sep}"):
                     self.add(filename_ondisk, filename_payload)
 
         return cleanup, package_versions
@@ -356,7 +356,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         # Disable Pylint `Too many nested blocks`
         # pylint: disable=too-many-nested-blocks,too-many-locals
         # Use the spotfire requirements file as a deny list.
-        _message("%s" % spotfire.__path__[0])
+        _message(f"{spotfire.__path__[0]}")
         if "spotfire.zip" in spotfire.__path__[0]:
             # Handle getting the requirements.txt from a zip file.
             with zipfile.ZipFile(os.path.split(spotfire.__path__[0])[0]) as zfile:
@@ -402,8 +402,8 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                                 if os.path.isfile(file):
                                     os.remove(file)
                                 else:
-                                    _message("Could not find RECORD file %s" % file)
-                            _message("Deleted files listed in RECORD for %s" % directory_name)
+                                    _message(f"Could not find RECORD file {file}")
+                            _message(f"Deleted files listed in RECORD for {directory_name}")
                             package_versions.pop(original_package_name, None)
                     if directory_name == package_name:
                         package_directories.add(directory_name)
@@ -416,7 +416,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 try:
                     shutil.rmtree(package_directory_file)
                 except OSError:
-                    _message("Unable to remove directory %s" % package_directory_file)
+                    _message(f"Unable to remove directory {package_directory_file}")
         _message("Completed removing files and directories for packages on the deny list.")
         return package_versions
 
@@ -487,7 +487,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         payload_fd, payload_tempfile = tempfile.mkstemp(prefix="spk")
         os.close(payload_fd)
         try:
-            _message("Building Spotfire SPK package %s." % self.output)
+            _message(f"Building Spotfire SPK package {self.output}.")
 
             # Assemble the payload zip
             self._build_payload(metadata, module, payload_tempfile)
@@ -496,7 +496,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             with zipfile.ZipFile(self.output, "w", compression=zipfile.ZIP_DEFLATED) as spk:
                 spk.writestr("module.xml", _et_to_bytes(module))
                 spk.writestr("Metadata.xml", _et_to_bytes(metadata))
-                spk.write(payload_tempfile, "Contents/%s" % self._payload_name())
+                spk.write(payload_tempfile, f"Contents/{self._payload_name()}")
             _message("Done.")
         finally:
             os.unlink(payload_tempfile)
@@ -538,7 +538,7 @@ class _ZipPackageBuilder(_PackageBuilder):
 
     def _payload_name(self) -> str:
         """Get the payload archive name for this package."""
-        return "%s.zip" % self.name
+        return f"{self.name}.zip"
 
     def _create_module(self) -> ElementTree.Element:
         """Create the module document."""
@@ -580,7 +580,7 @@ class _ZipPackageBuilder(_PackageBuilder):
                             "%Y-%m-%dT%H:%M:%SZ"),
                     })
                     if platform.system() != "Windows" and mode != 0o644:
-                        payload_script += "chmod %o %s\n" % (mode, filename_payload_fwdslash)
+                        payload_script += f"chmod {mode:o} {filename_payload_fwdslash}\n"
 
             # Add the payload script if we added any lines
             if payload_script:
@@ -611,7 +611,7 @@ class _CabPackageBuilder(_PackageBuilder):
 
     def _payload_name(self) -> str:
         """Get the payload archive name for this package."""
-        return "%s.cab" % self.name
+        return f"{self.name}.cab"
 
     def add_resource(self, name: str, location: str) -> None:
         """Add a public resource provided by this package."""
@@ -706,11 +706,11 @@ def python(args, hook=None) -> None:
             "Windows": "b95fbe51-c013-4f65-8523-5bffcf19e6a8",
             "Linux": "6692a2c3-d43d-4224-a8db-26619ae8f268",
         }.get(platform.system())
-        package_builder.name = "Python Interpreter %s" % platform.system()
+        package_builder.name = f"Python Interpreter {platform.system()}"
 
     # Get the version of the Python installation
     if sys.version_info.major == 3 and sys.version_info.minor < 5:
-        print("Error: Unsupported version of Python ('%s')." % sys.version)
+        print(f"Error: Unsupported version of Python ('{sys.version}').")
         sys.exit(1)
     package_builder.version = _SpkVersion.from_version_info(version_identifier)
 
@@ -783,7 +783,7 @@ def packages(args) -> None:
             if analyst:
                 name = "Python Packages"
             else:
-                name = "Python Packages %s" % platform.system()
+                name = f"Python Packages {platform.system()}"
         if pkg_id is None:
             pkg_id = str(uuid.uuid4())
         package_builder.name = name
@@ -793,7 +793,7 @@ def packages(args) -> None:
         if analyst:
             prefix = "site-packages"
             prefix_direct = True
-            package_builder.add_resource("python.package.%s.whl" % package_builder.id, prefix)
+            package_builder.add_resource(f"python.package.{package_builder.id}.whl", prefix)
         else:
             prefix = "root/python"
             prefix_direct = False
@@ -832,8 +832,7 @@ def _handle_versioning(package_builder, installed_packages, brand, version, forc
     if version:
         given_version = _SpkVersion.from_str(version)
         if given_version < package_builder.version:
-            _error("Package version '%s' is lower than generated version '%s'." % (given_version,
-                                                                                   package_builder.version))
+            _error(f"Package version '{given_version}' is lower than generated version '{package_builder.version}'.")
             if not force:
                 sys.exit(1)
         package_builder.version = given_version
@@ -854,7 +853,7 @@ def _should_increment_major(old_packages, new_packages, force):
         new_version = pip_version.parse(new_packages[pkg])
         if previous_version > new_version:
             tick_major = True
-            _error("Package '%s' has a lower version than previously built." % pkg)
+            _error(f"Package '{pkg}' has a lower version than previously built.")
             if not force:
                 sys.exit(1)
     return tick_major
