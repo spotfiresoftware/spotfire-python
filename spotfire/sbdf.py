@@ -1055,7 +1055,7 @@ class _ValueType:
 
     def is_array(self) -> bool:
         """determines if this valuetype is an array type index"""
-        return self.type_id == _ValueTypeId.STRING or self.type_id == _ValueTypeId.BINARY
+        return self.type_id in (_ValueTypeId.STRING, _ValueTypeId.BINARY)
 
     def get_packed_size(self) -> int:
         """returns the packed byte size (on disk) of a valuetype"""

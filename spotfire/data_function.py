@@ -209,8 +209,8 @@ class AnalyticSpec:
         :param script: the Python script code this data function will run
         """
         self.analytic_type = analytic_type
-        self.inputs = inputs if isinstance(inputs, list) else list()
-        self.outputs = outputs if isinstance(outputs, list) else list()
+        self.inputs = inputs if isinstance(inputs, list) else []
+        self.outputs = outputs if isinstance(outputs, list) else []
         self.script = script
         self.debug_enabled = False
         self.globals = dict(__builtins__=__builtins__)
@@ -218,7 +218,8 @@ class AnalyticSpec:
         self.compiled_script = None
 
     def __repr__(self) -> str:
-        return f"{_utils.type_name(type(self))}({self.analytic_type!r}, {self.inputs!r}, {self.outputs!r}, {self.script!r})"
+        return f"{_utils.type_name(type(self))}({self.analytic_type!r}, \
+            {self.inputs!r}, {self.outputs!r}, {self.script!r})"
 
     def enable_debug(self) -> None:
         """Turn on the printing of debugging messages."""

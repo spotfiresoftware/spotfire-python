@@ -98,6 +98,7 @@ class _SpkVersion:
         return version
 
     def __str__(self):
+        # pylint: disable=consider-using-f-string
         return "%d.%d.%d.%d" % tuple(self._versions)
 
     def __repr__(self):
@@ -188,7 +189,7 @@ def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int
 
     # Read in the file, ignoring any current brand.
     lines = []
-    with open(filename, "r") as file:
+    with open(filename, "r", encoding="utf8") as file:
         for line in file.readlines():
             if not line.startswith(comment):
                 lines.append(line)
@@ -204,7 +205,7 @@ def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int
         data_json = data_json[brand_per_line:]
 
     # Write out the new file.
-    with open(filename, "w") as file:
+    with open(filename, "w", encoding="utf8") as file:
         file.writelines(lines)
 
 
@@ -217,7 +218,7 @@ def _read_brand(filename: str, comment: str) -> typing.Dict:
     """
     # Read in the file, pulling in only the lines with branding on them.
     lines = []
-    with open(filename, "r") as file:
+    with open(filename, "r", encoding="utf8") as file:
         for line in file.readlines():
             if line.startswith(comment):
                 lines.append(line)
@@ -228,7 +229,7 @@ def _read_brand(filename: str, comment: str) -> typing.Dict:
 
 
 class _PackageBuilder(metaclass=abc.ABCMeta):
-    # pylint: disable=too-many-instance-attributes
+    # pylint: disable=too-many-instance-attributes,consider-using-f-string
     def __init__(self) -> None:
         self.name = None
         self.version = None
@@ -264,7 +265,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             for filename in filenames:
                 filename_ondisk = os.path.join(root, filename)
                 filename_relative = os.path.relpath(filename_ondisk, py_prefix)
-                filename_payload = r"%s/%s" % (prefix, filename_relative)
+                filename_payload = f"{prefix}/{filename_relative}"
                 if not filename_relative.startswith(self._site_packages_dirname):
                     # Omit any packages installed in site-packages
                     self.add(filename_ondisk, filename_payload)
@@ -278,7 +279,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             for filename in filenames:
                 filename_ondisk = os.path.join(root, filename)
                 filename_relative = os.path.relpath(filename_ondisk, spotfire.__path__[0])
-                filename_payload = r"{}/{}/spotfire/{}".format(prefix, self._site_packages_dirname, filename_relative)
+                filename_payload = f"{prefix}/{self._site_packages_dirname}/spotfire/{filename_relative}"
                 self.add(filename_ondisk, filename_payload)
 
         # Grab the .dist-info directory.
@@ -291,8 +292,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     for filename in filenames:
                         filename_ondisk = os.path.join(root, filename)
                         filename_relative = os.path.relpath(filename_ondisk, spotfire_dist_info_dir)
-                        filename_payload = r"{}/{}/{}/{}".format(prefix, self._site_packages_dirname, subdir,
-                                                                 filename_relative)
+                        filename_payload = f"{prefix}/{self._site_packages_dirname}/{subdir}/{filename_relative}"
                         self.add(filename_ondisk, filename_payload)
 
     def scan_requirements_txt(self, requirements: str, prefix: str, prefix_direct: bool = False,
@@ -340,9 +340,9 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 filename_ondisk = os.path.join(root, filename)
                 filename_relative = os.path.relpath(filename_ondisk, tempdir)
                 if prefix_direct:
-                    filename_payload = r"%s/%s" % (prefix, filename_relative)
+                    filename_payload = f"{prefix}/{filename_relative}"
                 else:
-                    filename_payload = r"%s/%s/%s" % (prefix, self._site_packages_dirname, filename_relative)
+                    filename_payload = f"{prefix}/{self._site_packages_dirname}/{filename_relative}"
                 if not filename_relative.startswith(f"bin{os.path.sep}"):
                     self.add(filename_ondisk, filename_payload)
 
@@ -365,7 +365,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 deny_list = [line.decode("utf-8").rstrip('\n') for line in deny_requirements]
         else:
             # Handle getting the requirements.txt directly from the file system.
-            with open(os.path.join(spotfire.__path__[0], "requirements.txt")) as deny_file:
+            with open(os.path.join(spotfire.__path__[0], "requirements.txt"), encoding="utf8") as deny_file:
                 deny_requirements = deny_file.readlines()
             deny_list = [line.rstrip('\n') for line in deny_requirements]
 
@@ -387,7 +387,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                         # Go through the RECORD file from the package dist-info and delete each listed file
                         record_file = os.path.join(root, directory_name, 'RECORD')
                         if os.path.isfile(record_file):
-                            with open(record_file) as open_record_file:
+                            with open(record_file, encoding="utf8") as open_record_file:
                                 record_files = open_record_file.readlines()
                             for file in record_files:
                                 # Clean up the path to each file.
@@ -585,9 +585,9 @@ class _ZipPackageBuilder(_PackageBuilder):
             # Add the payload script if we added any lines
             if payload_script:
                 payload_script.insert(0, "#!/bin/sh\n")
-                payload.writestr(r"root/Tools/Update/%s.sh" % self.chmod_script_name, "".join(payload_script))
+                payload.writestr(f"root/Tools/Update/{self.chmod_script_name}.sh", "".join(payload_script))
                 ElementTree.SubElement(metadata_files, "File", {
-                    "TargetRelativePath": r"root\Tools\Update\%s" % self.chmod_script_name,
+                    "TargetRelativePath": f"root\\Tools\\Update\\{self.chmod_script_name}",
                     "LastModifiedDate": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
@@ -838,7 +838,7 @@ def _handle_versioning(package_builder, installed_packages, brand, version, forc
         package_builder.version = given_version
     # Handle versioned filenames
     if versioned_filename:
-        package_builder.output = re.sub(r"(\.spk)?$", r"-%s\1" % str(package_builder.version),
+        package_builder.output = re.sub(r"(\.spk)?$", f"-{str(package_builder.version)}\1",
                                         package_builder.output, 1)
 
 
