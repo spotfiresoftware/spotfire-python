@@ -15,23 +15,23 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_0(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/0.sbdf" % os.path.dirname(__file__))
+        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/0.sbdf")
         self.assertEqual(dataframe.shape, (0, 12))
 
         def verify(dict_, pre, post):
             """Check all metadata entries for a given table/column."""
-            self.assertEqual(dict_["%sMetaBoolean%s" % (pre, post)][0], True)
-            self.assertEqual(dict_["%sMetaInteger%s" % (pre, post)][0], 3)
-            self.assertEqual(dict_["%sMetaLong%s" % (pre, post)][0], 2)
-            self.assertAlmostEqual(dict_["%sMetaFloat%s" % (pre, post)][0], 0.333333343267441)
-            self.assertEqual(dict_["%sMetaDouble%s" % (pre, post)][0], 3.14)
-            self.assertEqual(dict_["%sMetaDateTime%s" % (pre, post)][0], datetime.datetime(1583, 1, 1))
-            self.assertEqual(dict_["%sMetaDate%s" % (pre, post)][0], datetime.date(1583, 1, 1))
-            self.assertEqual(dict_["%sMetaTime%s" % (pre, post)][0], datetime.time(0, 0, 33))
-            self.assertEqual(dict_["%sMetaTimeSpan%s" % (pre, post)][0], datetime.timedelta(0, 12, 300000))
-            self.assertEqual(dict_["%sMetaString%s" % (pre, post)][0], "The")
-            self.assertEqual(dict_["%sMetaDecimal%s" % (pre, post)][0], decimal.Decimal('33.4455'))
-            self.assertEqual(dict_["%sMetaBinary%s" % (pre, post)][0], b"\x01")
+            self.assertEqual(dict_[f"{pre}MetaBoolean{post}"][0], True)
+            self.assertEqual(dict_[f"{pre}MetaInteger{post}"][0], 3)
+            self.assertEqual(dict_[f"{pre}MetaLong{post}"][0], 2)
+            self.assertAlmostEqual(dict_[f"{pre}MetaFloat{post}"][0], 0.333333343267441)
+            self.assertEqual(dict_[f"{pre}MetaDouble{post}"][0], 3.14)
+            self.assertEqual(dict_[f"{pre}MetaDateTime{post}"][0], datetime.datetime(1583, 1, 1))
+            self.assertEqual(dict_[f"{pre}MetaDate{post}"][0], datetime.date(1583, 1, 1))
+            self.assertEqual(dict_[f"{pre}MetaTime{post}"][0], datetime.time(0, 0, 33))
+            self.assertEqual(dict_[f"{pre}MetaTimeSpan{post}"][0], datetime.timedelta(0, 12, 300000))
+            self.assertEqual(dict_[f"{pre}MetaString{post}"][0], "The")
+            self.assertEqual(dict_[f"{pre}MetaDecimal{post}"][0], decimal.Decimal('33.4455'))
+            self.assertEqual(dict_[f"{pre}MetaBinary{post}"][0], b"\x01")
 
         # Check table metadata
         verify(dataframe.spotfire_table_metadata, "SbdfTest.Table", "")
@@ -51,7 +51,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_1(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/1.sbdf" % os.path.dirname(__file__))
+        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/1.sbdf")
         self.assertEqual(dataframe.shape, (1, 12))
         self.assertEqual(dataframe.at[0, "Boolean"], False)
         self.assertEqual(dataframe.at[0, "Integer"], 69)
@@ -67,7 +67,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_100(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/100.sbdf" % os.path.dirname(__file__))
+        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/100.sbdf")
         self.assertEqual(dataframe.shape, (100, 12))
         self.assertEqual(dataframe.get("Boolean")[0:6].tolist(), [False, True, None, False, True, None])
         self.assertEqual(dataframe.get("Integer")[0:6].dropna().tolist(), [69.0, 73.0, 75.0, 79.0])
@@ -85,7 +85,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_10001(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data("%s/files/sbdf/10001.sbdf" % os.path.dirname(__file__))
+        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/10001.sbdf")
         self.assertEqual(dataframe.shape, (10001, 12))
         # Check the values in the first row
         self.assertEqual(dataframe.at[0, "Boolean"], False)

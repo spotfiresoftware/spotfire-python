@@ -31,11 +31,11 @@ if sys.platform == "win32":
             return self.close()
 
         def __repr__(self) -> str:
-            result = ["<%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)]
+            result = [f"<{self.__class__.__module__}.{self.__class__.__qualname__}"]
             if not self._opened:
                 result.append(" [closed]")
             elif self.filename is not None:
-                result.append(" filename=%r" % self.filename)
+                result.append(f" filename={self.filename!r}")
             result.append(">")
             return "".join(result)
 

@@ -24,7 +24,7 @@ class PythonVersionModifiedResult(xmlrunner.result._XMLTestResult):  # pylint: d
             suite_name = suite
             if test_runner.outsuffix:
                 # not checking with 'is not None', empty means no suffix.
-                suite_name = '%s-%s' % (suite, test_runner.outsuffix)
+                suite_name = f'{suite}-{test_runner.outsuffix}'
 
             # Build the XML file
             testsuite = PythonVersionModifiedResult._report_testsuite(suite_name, tests, doc, parent_element,
@@ -37,4 +37,4 @@ class PythonVersionModifiedResult(xmlrunner.result._XMLTestResult):  # pylint: d
         test_runner.output.write(xml_content)
 
 
-PYTHON_VERSION = "py%d%d" % (sys.version_info.major, sys.version_info.minor)
+PYTHON_VERSION = f"py{sys.version_info.major}{sys.version_info.minor}"
