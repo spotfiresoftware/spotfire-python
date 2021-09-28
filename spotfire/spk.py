@@ -838,7 +838,7 @@ def _handle_versioning(package_builder, installed_packages, brand, version, forc
         package_builder.version = given_version
     # Handle versioned filenames
     if versioned_filename:
-        package_builder.output = re.sub(r"(\.spk)?$", f"-{str(package_builder.version)}\1",
+        package_builder.output = re.sub(r"(\.spk)?$", fr"-{str(package_builder.version)}\1",
                                         package_builder.output, 1)
 
 
