@@ -37,4 +37,4 @@ class PythonVersionModifiedResult(xmlrunner.result._XMLTestResult):  # pylint: d
         test_runner.output.write(xml_content)
 
 
-PYTHON_VERSION = f"py{int(sys.version_info.major)}{int(sys.version_info.minor)}"
+PYTHON_VERSION = f"py{sys.version_info.major}{sys.version_info.minor}"

@@ -90,7 +90,7 @@ class AnalyticInput:
             return
         debug_fn(f"assigning {self.type} '{self.name}' from file {self.file}")
         dataframe = sbdf.import_data(self.file)
-        debug_fn(f"read {int(dataframe.shape[0])} rows {int(dataframe.shape[1])} columns")
+        debug_fn(f"read {dataframe.shape[0]} rows {dataframe.shape[1]} columns")
         try:
             table_meta = dataframe.spotfire_table_metadata
         except AttributeError:
@@ -305,7 +305,7 @@ class AnalyticSpec:
         self.debug(f"reading {len(self.inputs)} input variables")
         for i, input_ in enumerate(self.inputs):
             if _bad_string(input_.name) or input_.name == "":
-                self.debug(f"input {int(i)}: bad input variable name - skipped")
+                self.debug(f"input {i}: bad input variable name - skipped")
                 continue
             if input_.type != "NULL" and (_bad_string(input_.file) or input_.file == ""):
                 self.debug(f"input '{input_.name}': bad file name - skipped")
@@ -350,7 +350,7 @@ class AnalyticSpec:
         self.debug(f"writing {len(self.outputs)} output variables")
         for i, output in enumerate(self.outputs):
             if _bad_string(output.name) or output.name == "":
-                self.debug(f"output {int(i)}: bad output variable name - skipped")
+                self.debug(f"output {i}: bad output variable name - skipped")
                 continue
             if _bad_string(output.file) or output.file == "":
                 self.debug(f"output '{output.name}': bad file name - skipped")

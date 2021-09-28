@@ -64,7 +64,7 @@ def import_data(sbdf_file: typing.Union[str, bytes, int]) -> pd.DataFrame:
         # Read the file header
         version_major, version_minor = _FileHeader.read(file)
         if version_major != _FileHeader.Major_Version or version_minor != _FileHeader.Minor_Version:
-            raise SBDFError(f"unsupported file version {int(version_major)}.{int(version_minor)}")
+            raise SBDFError(f"unsupported file version {version_major}.{version_minor}")
 
         # Read the table metadata
         tmeta = _TableMetadata.read(file)
