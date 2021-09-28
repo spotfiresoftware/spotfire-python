@@ -64,7 +64,7 @@ def import_data(sbdf_file: typing.Union[str, bytes, int]) -> pd.DataFrame:
         # Read the file header
         version_major, version_minor = _FileHeader.read(file)
         if version_major != _FileHeader.Major_Version or version_minor != _FileHeader.Minor_Version:
-            raise SBDFError("unsupported file version %d.%d" % (version_major, version_minor))
+            raise SBDFError(f"unsupported file version {version_major}.{version_minor}")
 
         # Read the table metadata
         tmeta = _TableMetadata.read(file)
@@ -207,11 +207,11 @@ def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
             raise SBDFError("obj does not have unique column names")
         columns = obj.to_dict("list")
         column_names = obj.columns.tolist()
-        column_types = {str(k): _ValueTypeId.infer_from_dtype(v, "column '%s'" % str(k)) for (k, v) in obj.iteritems()}
+        column_types = {str(k): _ValueTypeId.infer_from_dtype(v, f"column '{str(k)}'") for (k, v) in obj.iteritems()}
     elif isinstance(obj, pd.Series):
         # Handle series as columnar data
         series_name = default_column_name if obj.name is None else obj.name
-        series_description = "series" if obj.name is None else "series '%s'" % obj.name
+        series_description = "series" if obj.name is None else f"series '{obj.name}'"
 
         # Extract the column metadata from the series
         try:
@@ -231,7 +231,7 @@ def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
         column_metadata = {col: {} for col in obj.keys()}
         columns = obj
         column_names = obj.keys()
-        column_types = {str(k): _ValueTypeId.infer_from_type(v, "column '%s'" % str(k)) for (k, v) in obj.items()}
+        column_types = {str(k): _ValueTypeId.infer_from_type(v, f"column '{str(k)}'") for (k, v) in obj.items()}
     elif isinstance(obj, (str, bytes, bytearray)):
         # Handle strings and bytes as scalar data
         column_metadata[default_column_name] = {}
@@ -294,7 +294,7 @@ def _export_column_metadata(columns: typing.Dict[str, typing.List], column_names
             row_count = len(columns[colname])
         else:
             if row_count != len(columns[colname]):
-                raise SBDFError("column '%s' has inconsistent column length" % colname)
+                raise SBDFError(f"column '{colname}' has inconsistent column length")
         _ColumnMetadata.set_values(metadata, colname, column_types.get(str(colname)))
         tmeta.add(metadata)
     return row_count
@@ -367,7 +367,7 @@ class _ColumnSlice:
         self.property_values = []
 
     def __repr__(self) -> str:
-        return "<%s object: %r>" % (_utils.type_name(type(self)), self.values)
+        return f"<{_utils.type_name(type(self))} object: {self.values!r}>"
 
     def add_property(self, name: str, values: '_ValueArray') -> None:
         """stores a named value property reference in the given column slice"""
@@ -428,7 +428,7 @@ class _TableSlice:
         self.columns = []
 
     def __repr__(self) -> str:
-        return "<%s object: %r>" % (_utils.type_name(type(self)), self.columns)
+        return f"<{_utils.type_name(type(self))} object: {self.columns!r}>"
 
     def column_count(self) -> int:
         """get the number of columns in the table slice"""
@@ -522,7 +522,7 @@ class _TableMetadata:
         self.column_metadata = []
 
     def __repr__(self) -> str:
-        return "<%s object: %r %r>" % (_utils.type_name(type(self)), self.table_metadata, self.column_metadata)
+        return f"<{_utils.type_name(type(self))} object: {self.table_metadata!r} {self.column_metadata!r}>"
 
     def column_count(self) -> int:
         """return the number of columns in this table"""
@@ -620,7 +620,7 @@ class _Metadata:
         self.default_values = []
 
     def __repr__(self) -> str:
-        return "<%s object: %r -> %r>" % (_utils.type_name(type(self)), self.names, self.values)
+        return f"<{_utils.type_name(type(self))} object: {self.names!r} -> {self.values!r}>"
 
     def add_str(self, name: str, value: str, default_value: str = None) -> None:
         """adds a named string metadata value and default value to out"""
@@ -697,7 +697,7 @@ class _SbdfObject:
         self.data = data
 
     def __repr__(self) -> str:
-        return "<%s object (%r): %r>" % (_utils.type_name(type(self)), self.valuetype, self.data)
+        return f"<{_utils.type_name(type(self))} object ({self.valuetype!r}): {self.data!r}>"
 
     def get_count(self) -> int:
         """get the number of items in the object"""
@@ -842,7 +842,7 @@ class _ValueArray:
             arr = self.obj1.data[0]
         else:
             arr = "unknown encoding"
-        return "<%s object (%r): %r>" % (_utils.type_name(type(self)), self.encoding, arr)
+        return f"<{_utils.type_name(type(self))} object ({self.encoding!r}): {arr!r}>"
 
     def get_values(self) -> _SbdfObject:
         """extracts the values from the array"""
@@ -982,11 +982,11 @@ class _ValueTypeId(enum.IntEnum):
         vals = [x for x in values if not pd.isnull(x)]
         # Check if any values remain
         if not vals:
-            raise SBDFError("cannot determine type for %s; all values are missing" % value_description)
+            raise SBDFError(f"cannot determine type for {value_description}; all values are missing")
         # Check to make sure only one type remains
         vals_type = type(vals[0])
         if not all(isinstance(i, vals_type) for i in vals):
-            raise SBDFError("types in %s do not match" % value_description)
+            raise SBDFError(f"types in {value_description} do not match")
         # Determine the right type id
         typeid = {
             bool: _ValueTypeId.BOOL,
@@ -1007,7 +1007,7 @@ class _ValueTypeId(enum.IntEnum):
             decimal.Decimal: _ValueTypeId.DECIMAL,
         }.get(vals_type, None)
         if typeid is None:
-            raise SBDFError("unknown type '%s' in %s" % (_utils.type_name(vals_type), value_description))
+            raise SBDFError(f"unknown type '{_utils.type_name(vals_type)}' in {value_description}")
         return typeid
 
     @staticmethod
@@ -1030,7 +1030,7 @@ class _ValueTypeId(enum.IntEnum):
             "timedelta64[ns]": _ValueTypeId.TIMESPAN,
         }.get(dtype, None)
         if typeid is None:
-            raise SBDFError("unknown dtype '%s' in %s" % (dtype, series_description))
+            raise SBDFError(f"unknown dtype '{dtype}' in {series_description}")
         return typeid
 
 
@@ -1055,7 +1055,7 @@ class _ValueType:
 
     def is_array(self) -> bool:
         """determines if this valuetype is an array type index"""
-        return self.type_id == _ValueTypeId.STRING or self.type_id == _ValueTypeId.BINARY
+        return self.type_id in (_ValueTypeId.STRING, _ValueTypeId.BINARY)
 
     def get_packed_size(self) -> int:
         """returns the packed byte size (on disk) of a valuetype"""
@@ -1233,8 +1233,8 @@ class _ValueType:
         try:
             return getattr(self, "_to_bytes_" + self.type_id.name.lower(), lambda x: None)(obj)
         except (struct.error, bitstring.CreationError, UnicodeError) as exc:
-            raise SBDFError("cannot convert '%s' to Spotfire %s type; value is outside representable range" %
-                            (obj, self.type_id.to_typename_string())) from exc
+            raise SBDFError(f"cannot convert '{obj}' to Spotfire {self.type_id.to_typename_string()} \
+            type; value is outside representable range") from exc
 
     def missing_value(self) -> typing.Any:
         """return a missing value appropriate for the value type"""
