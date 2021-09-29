@@ -24,7 +24,7 @@ class DataFunctionTest(unittest.TestCase):
             for k in inputs:
                 if inputs[k] is None:
                     in_type = "NULL"
-                    print("test: missing input '%s' " % k)
+                    print(f"test: missing input '{k}' ")
                     input_spec.append(datafn.AnalyticInput(k, in_type, None))
                     continue
                 if isinstance(inputs[k], pd.DataFrame):
@@ -37,7 +37,7 @@ class DataFunctionTest(unittest.TestCase):
                 tmp = temp_files.new_file(suffix=".sbdf")
                 tmp.close()
                 sbdf.export_data(inputs[k], tmp.name, k)
-                print("test: writing input %s '%s' to file '%s'" % (in_type, k, tmp.name))
+                print(f"test: writing input {in_type} '{k}' to file '{tmp.name}'")
                 input_spec.append(datafn.AnalyticInput(k, in_type, tmp.name))
             output_spec = []
             for k in outputs:
@@ -74,19 +74,19 @@ class DataFunctionTest(unittest.TestCase):
             print("test: done evaluating spec")
 
             for output in output_spec:
-                print("test: reading output variable '%s' from file '%s'" % (output.name, output.file))
+                print(f"test: reading output variable '{output.name}' from file '{output.file}'")
                 if os.path.isfile(output.file):
                     try:
                         data_frame = sbdf.import_data(output.file)
                         print(data_frame)
                         pdtest.assert_frame_equal(outputs[output.name], data_frame)
                         try:
-                            print("test: table metadata:\n%r" % data_frame.spotfire_table_metadata)
+                            print(f"test: table metadata:\n{data_frame.spotfire_table_metadata!r}")
                         except AttributeError:
                             pass
                         for col in data_frame.columns:
                             try:
-                                print("test: column '%s' metadata:\n%r" % (col, data_frame[col].spotfire_column_metadata))
+                                print(f"test: column '{col}' metadata:\n{data_frame[col].spotfire_column_metadata!r}")
                             except AttributeError:
                                 pass
                         self._assert_table_metadata_equal(outputs[output.name], data_frame)
@@ -386,7 +386,7 @@ Traceback (most recent call last):
   File "data_function.py", line 255, in evaluate
     self._write_outputs(result)
   File "data_function.py", line 346, in _write_outputs
-    raise DataFunctionError("Output variable '%s' was not defined" % output.name)
+    raise DataFunctionError(f"Output variable '{output.name}' was not defined")
 """)
 
     def test_table_metadata(self):
