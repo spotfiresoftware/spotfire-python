@@ -116,7 +116,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read__write_geodata(self):
         """Test that geo-encoded data is properly converted to/from GeoDataFrame"""
-        gdf = sbdf.import_data("%s/files/sbdf/NACountries.sbdf" % os.path.dirname(__file__))
+        gdf = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/NACountries.sbdf")
         self.assertIsInstance(gdf, pandas.DataFrame)
         self.assertIsInstance(gdf, geopandas.GeoDataFrame)
         self.assertEqual(gdf.crs.to_epsg(), 4326)
