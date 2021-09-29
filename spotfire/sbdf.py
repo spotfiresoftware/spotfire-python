@@ -1478,7 +1478,13 @@ if gpd is not None:
         else:
             raise SBDFError("cannot convert collections of Shapely objects")
         if gdf.crs is not None:
-            table_metadata["MapChart.GeographicCrs"] = gdf.crs.to_string()
+            try:
+                table_metadata["MapChart.GeographicCrs"] = gdf.crs.to_string()
+            except AttributeError:
+                # GeoPandas <= 0.6.3 compatibility
+                if gdf.crs.startswith("+init="):
+                    gdf.crs = gdf.crs[6:]
+                table_metadata["MapChart.GeographicCrs"] = gdf.crs
         return dframe
 
 
@@ -1495,7 +1501,14 @@ if gpd is not None:
         # Decide what CRS to use
         if "MapChart.GeographicCrs" in table_metadata.keys() and table_metadata["MapChart.GeographicCrs"] != "":
             proj = table_metadata["MapChart.GeographicCrs"][0]
-            gdf = gdf.set_crs(proj)
+            gdf.crs = proj
+            try:
+                # GeoPandas <= 0.6.3 compatibility
+                if not gdf.crs.startswith("+init="):
+                    gdf.crs = "+init=" + proj
+            except AttributeError:
+                pass
+
         return gdf
 
 if matplotlib is not None:

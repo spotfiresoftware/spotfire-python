@@ -5,6 +5,7 @@ import decimal
 import os
 import unittest
 import tempfile
+import pkg_resources
 
 import pandas
 import geopandas
@@ -114,15 +115,25 @@ class SbdfTest(unittest.TestCase):
         self.assertEqual(dataframe.at[10000, "String"], "kiwis")
         self.assertEqual(dataframe.at[10000, "Binary"], b"\x7c\x7d\x7e\x7f")
 
-    def test_read__write_geodata(self):
+    def test_read_write_geodata(self):
         """Test that geo-encoded data is properly converted to/from GeoDataFrame"""
         gdf = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/NACountries.sbdf")
         self.assertIsInstance(gdf, pandas.DataFrame)
         self.assertIsInstance(gdf, geopandas.GeoDataFrame)
-        self.assertEqual(gdf.crs.to_epsg(), 4326)
-        self.assertEqual(gdf.crs.to_string(), "EPSG:4326")
-        with tempfile.TemporaryDirectory() as tempdir:
-            sbdf.export_data(gdf, tempdir + "\\test.sbdf")
-            gdf2 = sbdf.import_data(tempdir + "\\test.sbdf")
-            self.assertEqual(gdf2.crs.to_epsg(), 4326)
-            self.assertEqual(gdf2.crs.to_string(), "EPSG:4326")
+
+        # GeoPandas >= 0.7.0
+        if pkg_resources.parse_version(geopandas.__version__) >= pkg_resources.parse_version("0.7.0"):
+            self.assertEqual(gdf.crs.to_epsg(), 4326)
+            self.assertEqual(gdf.crs.to_string(), "EPSG:4326")
+            with tempfile.TemporaryDirectory() as tempdir:
+                sbdf.export_data(gdf, tempdir + "\\test.sbdf")
+                gdf2 = sbdf.import_data(tempdir + "\\test.sbdf")
+                self.assertEqual(gdf2.crs.to_epsg(), 4326)
+                self.assertEqual(gdf2.crs.to_string(), "EPSG:4326")
+        else:
+            # GeoPandas < 0.7.0 compatibility
+            self.assertEqual(gdf.crs, "+init=EPSG:4326")
+            with tempfile.TemporaryDirectory() as tempdir:
+                sbdf.export_data(gdf, tempdir + "\\test.sbdf")
+                gdf2 = sbdf.import_data(tempdir + "\\test.sbdf")
+                self.assertEqual(gdf2.crs, "+init=EPSG:4326")
