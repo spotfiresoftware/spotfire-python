@@ -295,13 +295,15 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                         filename_payload = f"{prefix}/{self._site_packages_dirname}/{subdir}/{filename_relative}"
                         self.add(filename_ondisk, filename_payload)
 
-    def scan_requirements_txt(self, requirements: str, prefix: str, prefix_direct: bool = False,
+    def scan_requirements_txt(self, requirements: str, constraint: str, prefix: str, prefix_direct: bool = False,
                               use_deny_list: bool = False) -> \
             typing.Tuple[typing.Callable[[], None], typing.Dict[str, str]]:
         """Scan the contents of a pip 'requirements.txt' file into site-packages.
 
         :param requirements: the filename of the requirements file that declares the pip packages to put in the
         SPK package
+        :param constraint: the filename of the constraints file that declares the constraints pip should apply
+        when resolving requirements
         :param prefix: the directory prefix under which the pip packages should be scanned into
         :param prefix_direct: whether to scan the pip packages into the ``site-packages`` directory
         :param use_deny_list: whether to delete the packages included with the Interpreter from the
@@ -319,8 +321,11 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         # Install the packages from the requirement file into tempdir.
         _message(f"Installing pip packages from {requirements} to temporary location.")
         try:
-            pip_output = _tee([sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
-                               "--target", tempdir, "--requirement", requirements])
+            command = [sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
+                             "--target", tempdir, "--requirement", requirements]
+            if constraint:
+                command.extend(["--constraint", constraint])
+            pip_output = _tee(command)
         except subprocess.CalledProcessError:
             _error("Error installing required packages.  Aborting.")
             cleanup()
@@ -663,11 +668,15 @@ class _CabPackageBuilder(_PackageBuilder):
 @subcommand([argument("spk-file", help="path to the SPK file to build"),
              argument("-v", "--version", default=1000, type=int, help="set the final component of the version number "
                                                                       "of the built SPK file (default: 1000)"),
-             argument("--exclude", action="append", help="exclude files from the built SPK file"),
+             argument("--exclude", action="append", metavar="PATH", help="exclude files from the built SPK file"),
+             argument("-c", "--constraint", metavar="FILE", help="apply the constraints in the file when installing "
+                                                                 "Python packages"),
              argument("--analyst", action="store_true", help="build the SPK file for use with Spotfire Analyst"),
-             argument("--cert", help="path to the certificate file to sign the package with (Analyst only)"),
+             argument("--cert", metavar="FILE", help="path to the certificate file to sign the package with (Analyst "
+                                                     "only)"),
              argument("--password", help="password for the certificate file (Analyst only)"),
-             argument("--timestamp", help="URL of a timestamping service to timestamp the package with (Analyst only)"),
+             argument("--timestamp", metavar="URL", help="URL of a timestamping service to timestamp the package with "
+                                                         "(Analyst only)"),
              argument("--sha256", action="store_true", help="use SHA-256 for file and timestamp digests (Analyst only)")
              ])
 def python(args, hook=None) -> None:
@@ -727,7 +736,8 @@ def python(args, hook=None) -> None:
     package_builder.scan_spotfire_package(prefix)
     spotfire_requirements = os.path.join(spotfire.__path__[0], "requirements.txt")
     try:
-        cleanup, _ = package_builder.scan_requirements_txt(spotfire_requirements, prefix)
+        constraints = getattr(args, "constraint")
+        cleanup, _ = package_builder.scan_requirements_txt(spotfire_requirements, constraints, prefix)
         if hook is not None:
             hook.scan_finished(package_builder)
 
@@ -745,10 +755,14 @@ def python(args, hook=None) -> None:
                                                                         "contain the version number of the built "
                                                                         "package"),
              argument("-n", "--name", help="set the internal module name of the built SPK file"),
+             argument("-c", "--constraint", metavar="FILE", help="apply the constraints in the file when installing "
+                                                                 "Python packages"),
              argument("--analyst", action="store_true", help="build the SPK file for use with Spotfire Analyst"),
-             argument("--cert", help="path to the certificate file to sign the package with (Analyst only)"),
+             argument("--cert", metavar="FILE", help="path to the certificate file to sign the package with (Analyst "
+                                                     "only)"),
              argument("--password", help="password for the certificate file (Analyst only)"),
-             argument("--timestamp", help="URL of a timestamping service to timestamp the package with (Analyst only)"),
+             argument("--timestamp", metavar="URL", help="URL of a timestamping service to timestamp the package with "
+                                                         "(Analyst only)"),
              argument("--sha256", action="store_true", help="use SHA-256 for file and timestamp digests (Analyst only)")
              ])
 def packages(args) -> None:
@@ -797,8 +811,9 @@ def packages(args) -> None:
         else:
             prefix = "root/python"
             prefix_direct = False
-        cleanup, installed_packages = package_builder.scan_requirements_txt(requirements_file, prefix, prefix_direct,
-                                                                            True)
+        constraints = getattr(args, "constraint")
+        cleanup, installed_packages = package_builder.scan_requirements_txt(requirements_file, constraints, prefix,
+                                                                            prefix_direct, True)
 
         # Based on the packages we installed, determine how to increment the version number
         _handle_versioning(package_builder, installed_packages, brand, version, force, versioned_filename)
