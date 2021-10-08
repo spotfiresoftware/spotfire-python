@@ -3,4 +3,4 @@
 # in the license file that is distributed with this file.
 
 # pylint: skip-file
-__version__="1.3.0.geopandas"
+__version__="1.4.0.dev0"
