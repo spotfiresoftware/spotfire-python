@@ -24,6 +24,15 @@ jobs:
         with:
           name: dist
           path: 'dist/**'
+      - name: Determine Test Environments
+        id: find-test-envs
+        run: |
+          echo -n "::set-output name=test-envs::[" > envs.txt
+          ls test_requirements_* | sed -e 's/test_requirements_/"/' -e 's/.txt/"/' | tr '\n' ',' | sed -e 's/,$//' >> envs.txt
+          echo "]" >> envs.txt
+          cat envs.txt
+    outputs:
+      test-environments: ${{ steps.find-test-envs.outputs.test-envs }}
   test:
     name: Test
     needs: build
@@ -31,6 +40,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.7', '3.8', '3.9']
+        test-environment: ${{ fromJson(needs.build.outputs.test-environments) }}
     steps:
       - uses: actions/checkout@v2
       - name: Set Up Python
@@ -40,12 +50,12 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements_dev.txt
+          pip install -r test_requirements_${{ matrix.test-environment }}.txt
       - name: Run Tests
         run: |
           python -m spotfire.test
       - uses: actions/upload-artifact@v2
         with:
-          name: test-results-${{ matrix.python-version }}
+          name: test-results-${{ matrix.python-version }}-${{ matrix.test-environment }}
           path: 'results-*.xml'
 

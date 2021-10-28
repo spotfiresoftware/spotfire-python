@@ -1,0 +1,8 @@
+-r spotfire/requirements.txt
+
+unittest-xml-reporting
+geopandas
+matplotlib
+pillow
+seaborn
+shapely
