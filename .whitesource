@@ -1,0 +1,15 @@
+{
+  "scanSettings": {
+    "configMode": "EXTERNAL",
+    "configExternalURL": "https://raw.githubusercontent.com/TIBCOSpotfire/spotfire-python/main/.whitesource.config",
+    "projectToken": "",
+    "baseBranches": ["main"]
+  },
+  "checkRunSettings": {
+    "vulnerableCheckRunConclusionLevel": "failure",
+    "displayMode": "diff"
+  },
+  "issueSettings": {
+    "minSeverityLevel": "LOW"
+  }
+}
