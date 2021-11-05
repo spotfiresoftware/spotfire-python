@@ -205,7 +205,8 @@ def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
 
         if len({str(x) for x in obj.keys()}) != len(obj.columns):
             raise SBDFError("obj does not have unique column names")
-        columns = obj.to_dict("list")
+        # columns = obj.to_dict("list")
+        columns = obj
         column_names = obj.columns.tolist()
         column_types = {str(k): _ValueTypeId.infer_from_dtype(v, f"column '{str(k)}'") for (k, v) in obj.iteritems()}
     elif isinstance(obj, pd.Series):
@@ -303,21 +304,36 @@ def _export_column_metadata(columns: typing.Dict[str, typing.List], column_names
 def _export_table_slices(columns: typing.Dict[str, typing.List], column_names: typing.List[str],
                          column_types: typing.Dict[str, '_ValueTypeId'], file: typing.BinaryIO,
                          row_count: int, tmeta: '_TableMetadata') -> None:
-    max_rows_per_slice = max(10, 100000 // max(1, len(column_names)))
+    # max_rows_per_slice = max(10, 100000 // max(1, len(column_names)))
+    max_rows_per_slice = 50000
     row_offset = 0
     while row_offset < row_count:
         slice_row_count = min(max_rows_per_slice, row_count - row_offset)
         tslice = _TableSlice(tmeta)
         for colname in column_names:
-            obj = _SbdfObject(column_types.get(str(colname)), columns[colname][row_offset:row_offset + slice_row_count])
+            if isinstance(columns, pd.DataFrame):
+                dataslice = columns.loc[row_offset:row_offset + slice_row_count, colname]
+            else:
+                dataslice = columns[colname][row_offset:row_offset + slice_row_count]
+            obj = _SbdfObject(column_types.get(str(colname)), dataslice)
             cslice = _ColumnSlice(_ValueArray(_ValueArrayEncoding.PLAIN_ARRAY, obj))
-            invalid = [pd.isnull(x) for x in obj.data]
-            if any(invalid):
-                obj_vt = _ValueType(column_types.get(str(colname)))
-                obj.data = [obj_vt.missing_value() if missing else val for val, missing in zip(obj.data, invalid)]
-                obj_empty = _SbdfObject(_ValueTypeId.BOOL, invalid)
-                va_empty = _ValueArray(_ValueArrayEncoding.BIT_ARRAY, obj_empty)
-                cslice.add_property(_ColumnSlice.ValueProperty_IsInvalid, va_empty)
+
+            if isinstance(dataslice, pd.Series):
+                invalid = dataslice.isna()
+                if invalid.sum() > 0:
+                    obj_vt = _ValueType(column_types.get(str(colname)))
+                    dataslice = dataslice.fillna(obj_vt.missing_value())
+                    obj_empty = _SbdfObject(_ValueTypeId.BOOL, invalid.tolist())
+                    va_empty = _ValueArray(_ValueArrayEncoding.BIT_ARRAY, obj_empty)
+                    cslice.add_property(_ColumnSlice.ValueProperty_IsInvalid, va_empty)
+            else:
+                invalid = [pd.isnull(x) for x in obj.data]
+                if any(invalid):
+                    obj_vt = _ValueType(column_types.get(str(colname)))
+                    obj.data = [obj_vt.missing_value() if missing else val for val, missing in zip(obj.data, invalid)]
+                    obj_empty = _SbdfObject(_ValueTypeId.BOOL, invalid)
+                    va_empty = _ValueArray(_ValueArrayEncoding.BIT_ARRAY, obj_empty)
+                    cslice.add_property(_ColumnSlice.ValueProperty_IsInvalid, va_empty)
             tslice.add(cslice)
         tslice.write(file)
         row_offset += slice_row_count
@@ -717,32 +733,52 @@ class _SbdfObject:
         valtype = _ValueType(self.valuetype)
         if valtype.is_array():
             byte_size = 0
+            # packed: no need to write 7bit packed int32
             if packed:
-                saved_bytes = []
-                for i in range(n):
-                    saved_bytes.append(valtype.to_bytes(self.data[i]))
-                    length = len(saved_bytes[i])
-                    byte_size += _get_7bit_packed_length(length) + length
-                _write_int32(file, byte_size)
-                for i in range(n):
-                    length = len(saved_bytes[i])
-                    _write_7bit_packed_int32(file, length)
-                    if length:
-                        _write_bytes(file, saved_bytes[i])
+                if isinstance(self.data, pd.Series):
+                    barr = self.data.values.astype('S')
+                    _write_int32(file, sum(_get_7bit_packed_length(len(s)) + len(s) for s in barr))
+                    for s in barr:
+                        _write_7bit_packed_int32(file, len(s))
+                        if len(s):
+                            _write_bytes(file, s)
+                else:
+                    saved_bytes = []
+                    for i in range(n):
+                        saved_bytes.append(valtype.to_bytes(self.data[i]))
+                        length = len(saved_bytes[i])
+                        byte_size += _get_7bit_packed_length(length) + length
+                    _write_int32(file, byte_size)
+                    for i in range(n):
+                        length = len(saved_bytes[i])
+                        _write_7bit_packed_int32(file, length)
+                        if length:
+                            _write_bytes(file, saved_bytes[i])
             else:
-                for i in range(n):
-                    valtype_bytes = valtype.to_bytes(self.data[i])
-                    length = len(valtype_bytes)
-                    _write_int32(file, length)
-                    if length:
-                        _write_bytes(file, valtype_bytes)
+                if isinstance(self.data, pd.Series):
+                    barr = self.data.values.astype('S')
+                    for s in barr:
+                        _write_7bit_packed_int32(file, len(s))
+                        if len(s):
+                            _write_bytes(file, s)
+                else:
+                    for i in range(n):
+                        valtype_bytes = valtype.to_bytes(self.data[i])
+                        length = len(valtype_bytes)
+                        _write_int32(file, length)
+                        if length:
+                            _write_bytes(file, valtype_bytes)
         else:
             size = valtype.get_packed_size()
             if size is None:
                 raise SBDFError("unknown typeid")
-            for i in range(n):
-                valtype_bytes = valtype.to_bytes(self.data[i])
-                _write_bytes(file, valtype_bytes)
+            
+            if isinstance(self.data, pd.Series):
+                _write_bytes(file, self.data.values.tobytes())
+            else:
+                for i in range(n):
+                    valtype_bytes = valtype.to_bytes(self.data[i])
+                    _write_bytes(file, valtype_bytes)
 
     @classmethod
     def read_array(cls, file: typing.BinaryIO, valuetype: '_ValueType') -> '_SbdfObject':
@@ -979,7 +1015,10 @@ class _ValueTypeId(enum.IntEnum):
     def infer_from_type(values, value_description: str) -> '_ValueTypeId':
         """determine the proper valuetype id from the Python types in a column"""
         # Remove any None (or other none-ish things) from values
-        vals = [x for x in values if not pd.isnull(x)]
+        if isinstance(values, pd.Series):
+            vals = values.dropna().tolist()
+        else:
+            vals = [x for x in values if not pd.isnull(x)]
         # Check if any values remain
         if not vals:
             raise SBDFError(f"cannot determine type for {value_description}; all values are missing")
@@ -1015,7 +1054,7 @@ class _ValueTypeId(enum.IntEnum):
         """determine the proper valuetype id from the Pandas dtype of a series"""
         dtype = series.dtype.name
         if dtype == "object":
-            return _ValueTypeId.infer_from_type(series.tolist(), series_description)
+            return _ValueTypeId.infer_from_type(series, series_description)
         if dtype == "category":
             return _ValueTypeId.infer_from_dtype(series.astype(series.cat.categories.dtype), series_description)
         typeid = {
@@ -1231,7 +1270,33 @@ class _ValueType:
     def to_bytes(self, obj: typing.Any) -> bytes:
         """return a SBDF representation of the Python objects"""
         try:
-            return getattr(self, "_to_bytes_" + self.type_id.name.lower(), lambda x: None)(obj)
+            name = self.type_id
+            if name == _ValueTypeId.BOOL:
+                return self._to_bytes_bool(obj)
+            elif name == _ValueTypeId.INT: 
+                return self._to_bytes_int(obj)
+            elif name == _ValueTypeId.LONG: 
+                return self._to_bytes_long(obj)
+            elif name == _ValueTypeId.FLOAT: 
+                return self._to_bytes_float(obj)
+            elif name == _ValueTypeId.DOUBLE: 
+                return self._to_bytes_double(obj)
+            elif name == _ValueTypeId.DATETIME: 
+                return self._to_bytes_datetime(obj)
+            elif name == _ValueTypeId.DATE: 
+                return self._to_bytes_date(obj)
+            elif name == _ValueTypeId.TIME: 
+                return self._to_bytes_time(obj)
+            elif name == _ValueTypeId.TIMESPAN: 
+                return self._to_bytes_timespan(obj)
+            elif name == _ValueTypeId.STRING:
+                return self._to_bytes_string(obj)
+            elif name == _ValueTypeId.BINARY: 
+                return obj
+            elif name == _ValueTypeId.DECIMAL: 
+                return self._to_bytes_decimal(obj)
+            else:
+                return None
         except (struct.error, bitstring.CreationError, UnicodeError) as exc:
             raise SBDFError(f"cannot convert '{obj}' to Spotfire {self.type_id.to_typename_string()} \
             type; value is outside representable range") from exc
