@@ -729,6 +729,7 @@ class _SbdfObject:
         """writes the object to the specified file. valuetype information is not written"""
         self._write_n(file, 1, False)
 
+    # pylint: disable=too-many-branches
     def _write_n(self, file: typing.BinaryIO, n: int, packed: bool) -> None:
         valtype = _ValueType(self.valuetype)
         if valtype.is_array():
@@ -1267,6 +1268,7 @@ class _ValueType:
         return bitstring.pack('uintle:96,pad:17,bits:7,bool,bits:7', coefficient, biased_exponent_bits_high,
                               dec.sign, biased_exponent_bits_low).bytes
 
+    # pylint: disable=no-else-return,too-many-return-statements
     def to_bytes(self, obj: typing.Any) -> bytes:
         """return a SBDF representation of the Python objects"""
         try:
