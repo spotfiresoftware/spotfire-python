@@ -738,10 +738,10 @@ class _SbdfObject:
                 if isinstance(self.data, pd.Series):
                     barr = self.data.values.astype('S')
                     _write_int32(file, sum(_get_7bit_packed_length(len(s)) + len(s) for s in barr))
-                    for s in barr:
-                        _write_7bit_packed_int32(file, len(s))
-                        if len(s):
-                            _write_bytes(file, s)
+                    for bstr in barr:
+                        _write_7bit_packed_int32(file, len(bstr))
+                        if len(bstr):
+                            _write_bytes(file, bstr)
                 else:
                     saved_bytes = []
                     for i in range(n):
@@ -757,10 +757,10 @@ class _SbdfObject:
             else:
                 if isinstance(self.data, pd.Series):
                     barr = self.data.values.astype('S')
-                    for s in barr:
-                        _write_7bit_packed_int32(file, len(s))
-                        if len(s):
-                            _write_bytes(file, s)
+                    for bstr in barr:
+                        _write_7bit_packed_int32(file, len(bstr))
+                        if len(bstr):
+                            _write_bytes(file, bstr)
                 else:
                     for i in range(n):
                         valtype_bytes = valtype.to_bytes(self.data[i])
@@ -772,7 +772,7 @@ class _SbdfObject:
             size = valtype.get_packed_size()
             if size is None:
                 raise SBDFError("unknown typeid")
-            
+
             if isinstance(self.data, pd.Series):
                 _write_bytes(file, self.data.values.tobytes())
             else:
@@ -1273,27 +1273,27 @@ class _ValueType:
             name = self.type_id
             if name == _ValueTypeId.BOOL:
                 return self._to_bytes_bool(obj)
-            elif name == _ValueTypeId.INT: 
+            elif name == _ValueTypeId.INT:
                 return self._to_bytes_int(obj)
-            elif name == _ValueTypeId.LONG: 
+            elif name == _ValueTypeId.LONG:
                 return self._to_bytes_long(obj)
-            elif name == _ValueTypeId.FLOAT: 
+            elif name == _ValueTypeId.FLOAT:
                 return self._to_bytes_float(obj)
-            elif name == _ValueTypeId.DOUBLE: 
+            elif name == _ValueTypeId.DOUBLE:
                 return self._to_bytes_double(obj)
-            elif name == _ValueTypeId.DATETIME: 
+            elif name == _ValueTypeId.DATETIME:
                 return self._to_bytes_datetime(obj)
-            elif name == _ValueTypeId.DATE: 
+            elif name == _ValueTypeId.DATE:
                 return self._to_bytes_date(obj)
-            elif name == _ValueTypeId.TIME: 
+            elif name == _ValueTypeId.TIME:
                 return self._to_bytes_time(obj)
-            elif name == _ValueTypeId.TIMESPAN: 
+            elif name == _ValueTypeId.TIMESPAN:
                 return self._to_bytes_timespan(obj)
             elif name == _ValueTypeId.STRING:
                 return self._to_bytes_string(obj)
-            elif name == _ValueTypeId.BINARY: 
+            elif name == _ValueTypeId.BINARY:
                 return obj
-            elif name == _ValueTypeId.DECIMAL: 
+            elif name == _ValueTypeId.DECIMAL:
                 return self._to_bytes_decimal(obj)
             else:
                 return None
