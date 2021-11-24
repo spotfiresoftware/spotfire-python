@@ -1,0 +1,22 @@
+name: Check Current PyLint
+on:
+  schedule:
+    - cron: '17 17 * * 1'
+permissions:
+  issues: write
+jobs:
+  pylint:
+    name: Check PyLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set Up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - name: Install Tools
+        run: |
+          pip install ghapi pylint
+      - name: Run PyLint
+        run: |
+          python .github/scripts/run_pylint_check.py --repo ${{ github.repository }} --label automated/pylint --src spotfire
