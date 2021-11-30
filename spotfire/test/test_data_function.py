@@ -226,6 +226,7 @@ Traceback (most recent call last):
     def test_syntax_error_c(self):
         """Run the syntax error test provided in pysrv122"""
         def expected():
+            # pylint: disable=no-else-return
             if sys.version_info.major == 3 and sys.version_info.minor < 10:
                 return """Error executing Python script:
 
