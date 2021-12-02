@@ -774,7 +774,7 @@ class _SbdfObject:
             if size is None:
                 raise SBDFError("unknown typeid")
 
-            if isinstance(self.data, pd.Series):
+            if isinstance(self.data, pd.Series) and isinstance(self.data.values, np.ndarray):
                 _write_bytes(file, self.data.values.tobytes())
             else:
                 for i in range(n):
