@@ -736,10 +736,11 @@ class _SbdfObject:
             byte_size = 0
             # packed: no need to write 7bit packed int32
             if packed:
-                if isinstance(self.data, pd.Series):
-                    barr = self.data.values.astype('S')
-                    _write_int32(file, sum(_get_7bit_packed_length(len(s)) + len(s) for s in barr))
+                if isinstance(self.data, pd.Series) and self.valuetype is not _ValueTypeId.BINARY:
+                    barr = self.data.values.astype('U')
+                    _write_int32(file, sum(_get_7bit_packed_length(len(s.encode("utf-8"))) + len(s.encode("utf-8")) for s in barr))
                     for bstr in barr:
+                        bstr = bstr.encode("utf-8")
                         _write_7bit_packed_int32(file, len(bstr))
                         if len(bstr):
                             _write_bytes(file, bstr)
@@ -1068,6 +1069,7 @@ class _ValueTypeId(enum.IntEnum):
             "float64": _ValueTypeId.DOUBLE,
             "datetime64[ns]": _ValueTypeId.DATETIME,
             "timedelta64[ns]": _ValueTypeId.TIMESPAN,
+            "string": _ValueTypeId.STRING,
         }.get(dtype, None)
         if typeid is None:
             raise SBDFError(f"unknown dtype '{dtype}' in {series_description}")
