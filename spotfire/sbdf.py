@@ -738,7 +738,8 @@ class _SbdfObject:
             if packed:
                 if isinstance(self.data, pd.Series) and self.valuetype is not _ValueTypeId.BINARY:
                     barr = self.data.values.astype('U')
-                    _write_int32(file, sum(_get_7bit_packed_length(len(s.encode("utf-8"))) + len(s.encode("utf-8")) for s in barr))
+                    _write_int32(file, sum(_get_7bit_packed_length(len(s.encode("utf-8"))) +
+                                            len(s.encode("utf-8")) for s in barr))
                     for bstr in barr:
                         bstr = bstr.encode("utf-8")
                         _write_7bit_packed_int32(file, len(bstr))

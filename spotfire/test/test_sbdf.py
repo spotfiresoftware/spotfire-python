@@ -146,3 +146,4 @@ class SbdfTest(unittest.TestCase):
             udf2 = sbdf.import_data(tempdir + "\\test.sbdf")
             for i in range(3):
                 self.assertEqual(udf.at[i, "x"], udf2.at[i, "x"])
+                
