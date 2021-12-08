@@ -166,7 +166,7 @@ Traceback (most recent call last):
   File "data_function.py", in _compile_script
     self.compiled_script = compile(self.script, '<data_function>', 'exec')
 """
-            else:
+            elif sys.version_info.major == 3 and sys.version_info.minor < 10:
                 return """Error executing Python script:
 
   File "<data_function>", line 1
@@ -178,12 +178,27 @@ Traceback (most recent call last):
   File "data_function.py", in _compile_script
     self.compiled_script = compile(self.script, '<data_function>', 'exec')
 """
+            else:
+                return """Error executing Python script:
+
+  File "<data_function>", line 1
+    rais TypeError('from test_syntax_error')
+    ^
+SyntaxError: invalid syntax. Perhaps you forgot a comma? (<data_function>, line 1)
+
+Traceback (most recent call last):
+  File "data_function.py", in _compile_script
+    self.compiled_script = compile(self.script, '<data_function>', 'exec')
+"""
 
         self._run_analytic("rais TypeError('from test_syntax_error')", {}, {}, False, expected)
 
     def test_syntax_error_b(self):
         """Test a data function that has a syntax error."""
-        self._run_analytic("if + 42", {}, {}, False, """Error executing Python script:
+        def expected():
+            # pylint: disable=no-else-return
+            if sys.version_info.major == 3 and sys.version_info.minor < 10:
+                return """Error executing Python script:
 
   File "<data_function>", line 1
     if + 42
@@ -193,11 +208,27 @@ SyntaxError: invalid syntax (<data_function>, line 1)
 Traceback (most recent call last):
   File "data_function.py", in _compile_script
     self.compiled_script = compile(self.script, '<data_function>', 'exec')
-""")
+"""
+            else:
+                return """Error executing Python script:
+
+  File "<data_function>", line 1
+    if + 42
+          ^
+SyntaxError: expected ':' (<data_function>, line 1)
+
+Traceback (most recent call last):
+  File "data_function.py", in _compile_script
+    self.compiled_script = compile(self.script, '<data_function>', 'exec')
+"""
+        self._run_analytic("if + 42", {}, {}, False, expected)
 
     def test_syntax_error_c(self):
         """Run the syntax error test provided in pysrv122"""
-        self._run_analytic("whille x%2 == 0:", {}, {}, False, """Error executing Python script:
+        def expected():
+            # pylint: disable=no-else-return
+            if sys.version_info.major == 3 and sys.version_info.minor < 10:
+                return """Error executing Python script:
 
   File "<data_function>", line 1
     whille x%2 == 0:
@@ -207,7 +238,20 @@ SyntaxError: invalid syntax (<data_function>, line 1)
 Traceback (most recent call last):
   File "data_function.py", in _compile_script
     self.compiled_script = compile(self.script, '<data_function>', 'exec')
-""")
+"""
+            else:
+                return """Error executing Python script:
+
+  File "<data_function>", line 1
+    whille x%2 == 0:
+    ^
+SyntaxError: invalid syntax. Perhaps you forgot a comma? (<data_function>, line 1)
+
+Traceback (most recent call last):
+  File "data_function.py", in _compile_script
+    self.compiled_script = compile(self.script, '<data_function>', 'exec')
+"""
+        self._run_analytic("whille x%2 == 0:", {}, {}, False, expected)
 
     def test_indentation_error(self):
         """Run the syntax error test provided in pysrv122"""

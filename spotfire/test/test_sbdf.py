@@ -137,3 +137,13 @@ class SbdfTest(unittest.TestCase):
                 sbdf.export_data(gdf, tempdir + "\\test.sbdf")
                 gdf2 = sbdf.import_data(tempdir + "\\test.sbdf")
                 self.assertEqual(gdf2.crs, "+init=EPSG:4326")
+
+    def test_write_unicode(self):
+        """Test that unicode string arrays are properly written"""
+        udf = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/unicode.sbdf")
+        with tempfile.TemporaryDirectory() as tempdir:
+            sbdf.export_data(udf, tempdir + "\\test.sbdf")
+            udf2 = sbdf.import_data(tempdir + "\\test.sbdf")
+            for i in range(3):
+                self.assertEqual(udf.at[i, "x"], udf2.at[i, "x"])
+                
