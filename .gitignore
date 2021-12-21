@@ -1,3 +1,7 @@
+# Cython generated sources
+/spotfire/*.c
+/spotfire/*.html
+
 # byte-compiled files
 __pycache__/
 *.py[cod]

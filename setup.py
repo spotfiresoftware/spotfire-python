@@ -3,7 +3,10 @@
 # in the license file that is distributed with this file.
 
 # pylint: skip-file
-from setuptools import setup, find_packages
+import sys
+
+from setuptools import setup, find_packages, Extension
+from Cython.Build import cythonize
 
 
 def get_requires(filename):
@@ -23,6 +26,20 @@ with open('spotfire/version.py') as ver_file:
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+if sys.platform == "win32":
+    codesign_includes = ['vendor/windows']
+    codesign_libraries = ['crypt32']
+else:
+    codesign_includes = []
+    codesign_libraries = []
+extensions = [
+    Extension("spotfire.codesign",
+              sources=["spotfire/codesign.pyx"],
+              include_dirs=codesign_includes,
+              libraries=codesign_libraries
+              ),
+]
+
 setup(
     name='spotfire',
     version=version['__version__'],
@@ -35,6 +52,7 @@ setup(
     url='https://github.com/TIBCOSoftware/spotfire-python',
     license='BSD 3-Clause License',
     packages=find_packages(exclude=['spotfire.test']),
+    ext_modules=cythonize(extensions, annotate=True),
     include_package_data=True,
     install_requires=project_requirements,
     python_requires='>=3.7',
@@ -43,5 +61,6 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
+        'Programming Language :: Cython',
     ],
 )

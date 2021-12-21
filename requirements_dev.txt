@@ -6,3 +6,4 @@ matplotlib
 pillow
 seaborn
 shapely
+Cython
