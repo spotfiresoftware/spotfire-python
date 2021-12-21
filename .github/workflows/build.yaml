@@ -13,7 +13,8 @@ jobs:
       - name: Install Tools
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements_lint.txt
+          grep requires pyproject.toml | sed -e 's/^.*\[\(.*\)\]$/\1/' -e 's/, */\n/g' -e 's/"//g' > pyproj-requires.txt
+          pip install -r requirements_lint.txt -r pyproj-requires.txt
       - name: Static Analysis with pylint
         run: |
           pylint spotfire
