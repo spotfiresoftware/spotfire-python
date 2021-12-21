@@ -13,7 +13,7 @@ jobs:
       - name: Install Tools
         run: |
           python -m pip install --upgrade pip
-          grep requires pyproject.toml | sed -e 's/^.*\[\(.*\)\]$/\1/' -e 's/, */\n/g' -e 's/"//g' > pyproj-requires.txt
+          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > pyproj-requires.txt
           pip install -r requirements_lint.txt -r pyproj-requires.txt
       - name: Static Analysis with pylint
         run: |
@@ -55,7 +55,7 @@ jobs:
       - name: Install Build Requirements
         run: |
           python -m pip install --upgrade pip
-          grep requires pyproject.toml | sed -e 's/^.*\[\(.*\)\]$/\1/' -e 's/, */\n/g' -e 's/"//g' > pyproj-requires.txt
+          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > pyproj-requires.txt
           pip install -r pyproj-requires.txt
       - name: Build Wheel
         run: |
