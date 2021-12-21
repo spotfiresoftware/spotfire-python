@@ -639,7 +639,7 @@ class _CabPackageBuilder(_PackageBuilder):
 
     def _build_payload(self, metadata: ElementTree.Element, module: ElementTree.Element, payload_dest: str) -> None:
         """Build the main payload archive for the SPK package."""
-        # pylint: disable=import-outside-toplevel
+        # pylint: disable=import-outside-toplevel,no-name-in-module
         from spotfire import cabfile, codesign
         metadata_files = metadata.find("Files")
 
