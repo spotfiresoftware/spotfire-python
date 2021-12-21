@@ -1,8 +1,8 @@
 name: Build and Test Package
 on: [push, pull_request]
 jobs:
-  build:
-    name: Packaging and Static Analysis
+  lint:
+    name: Static Analysis
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -17,30 +17,33 @@ jobs:
       - name: Static Analysis with pylint
         run: |
           pylint spotfire
-      - name: Packaging
+      - name: Source Packaging
         run: |
-          python setup.py sdist bdist_wheel
+          python setup.py sdist
       - uses: actions/upload-artifact@v2
         with:
-          name: dist
+          name: sdist
           path: 'dist/**'
-      - name: Determine Test Environments
-        id: find-test-envs
+      - name: Dynamic Elements
+        id: dynamic
         run: |
-          echo -n "::set-output name=test-envs::[" > envs.txt
-          ls test_requirements_* | sed -e 's/test_requirements_/"/' -e 's/.txt/"/' | tr '\n' ',' | sed -e 's/,$//' >> envs.txt
-          echo "]" >> envs.txt
-          cat envs.txt
+          echo -n "::set-output name=test-envs::[" > dynamic.txt
+          ls test_requirements_* | sed -e 's/test_requirements_/"/' -e 's/.txt/"/' | tr '\n' ',' | sed -e 's/,$//' >> dynamic.txt
+          echo "]" >> dynamic.txt
+          echo -n "::set-output name=pythons::" >> dynamic.txt
+          cat .github/python-versions.json >> dynamic.txt
+          cat dynamic.txt
     outputs:
-      test-environments: ${{ steps.find-test-envs.outputs.test-envs }}
-  test:
-    name: Test
-    needs: build
-    runs-on: ubuntu-latest
+      test-environments: ${{ steps.dynamic.outputs.test-envs }}
+      python-versions: ${{ steps.dynamic.outputs.pythons }}
+  build:
+    name: Build Wheels
+    needs: lint
+    runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9']
-        test-environment: ${{ fromJson(needs.build.outputs.test-environments) }}
+        python-version: ${{ fromJson(needs.lint.outputs.python-versions) }}
+        operating-system: ['ubuntu-latest', 'windows-latest']
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -48,10 +51,40 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install Build Requirements
+        run: |
+          python -m pip install --upgrade pip
+          grep requires pyproject.toml | sed -e 's/^.*\[\(.*\)\]$/\1/' -e 's/, */\n/g' -e 's/"//g' > pyproj-requires.txt
+          pip install -r pyproj-requires.txt
+      - name: Build Wheel
+        run: |
+          python setup.py bdist_wheel
+      - uses: actions/upload-artifact@v2
+        with:
+          name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
+          path: 'dist/**'
+  test:
+    name: Test
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ${{ fromJson(needs.lint.outputs.python-versions) }}
+        test-environment: ${{ fromJson(needs.lint.outputs.test-environments) }}
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: wheel-${{ matrix.python-version }}-ubuntu-latest
+      - name: Set Up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r test_requirements_${{ matrix.test-environment }}.txt
+          pip install dist/*.whl -r test_requirements_${{ matrix.test-environment }}.txt
       - name: Run Tests
         run: |
           python -m spotfire.test
