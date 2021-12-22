@@ -4,7 +4,6 @@ $ python -m spotfire.test
 """
 
 import os
-import sys
 import unittest
 import xmlrunner
 
