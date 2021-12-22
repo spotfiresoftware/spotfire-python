@@ -89,7 +89,7 @@ jobs:
           pip install dist/*.whl -r test_requirements_${{ matrix.test-environment }}.txt
       - name: Run Tests
         run: |
-          python -m spotfire.test
+          python -m spotfire.test ${{ matrix.python-version }}-${{ matrix.test-environment }}
       - uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:

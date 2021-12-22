@@ -3,6 +3,7 @@
 $ python -m spotfire.test
 """
 
+import sys
 import unittest
 import xmlrunner
 
@@ -20,6 +21,10 @@ def load_tests(loader, tests, pattern):  # pylint: disable=unused-argument
     return test_suite
 
 
-with open(f"results-{utils.PYTHON_VERSION}.xml", "wb") as output:
+if len(sys.argv) > 1:
+    name = sys.argv[1]
+else:
+    name = utils.PYTHON_VERSION
+with open(f"results-{name}.xml", "wb") as output:
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output=output, resultclass=utils.PythonVersionModifiedResult),
                   failfast=False, buffer=False, catchbreak=False)

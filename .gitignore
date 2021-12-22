@@ -6,6 +6,9 @@
 __pycache__/
 *.py[cod]
 
+# unit test results files
+/results-*.xml
+
 # distribution
 /build/
 /dist/
