@@ -81,7 +81,7 @@ cdef extern from "mssign32.h" nogil:
                                                     void*)
 
     # Function defined at https://docs.microsoft.com/en-us/windows/win32/seccrypto/signertimestampex2
-    ctypedef windows.HRESULT (*SignerTimeStampEx2Type)(DWORD, SIGNER_SUBJECT_INFO*, windows.LPCWSTR, char*,
+    ctypedef windows.HRESULT (*SignerTimeStampEx2Type)(windows.DWORD, SIGNER_SUBJECT_INFO*, windows.LPCWSTR, char*,
                                                        wincrypt.CRYPT_ATTRIBUTES*, void*, SIGNER_CONTEXT**)
 
     # Preprocessor defines for SignerTimeStampEx2 function arguments
