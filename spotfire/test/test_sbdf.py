@@ -146,4 +146,11 @@ class SbdfTest(unittest.TestCase):
             udf2 = sbdf.import_data(tempdir + "\\test.sbdf")
             for i in range(3):
                 self.assertEqual(udf.at[i, "x"], udf2.at[i, "x"])
-                
+
+    def test_read_write_alltypes(self):
+        """Test that all data types can be properly roundtripped read/write"""
+        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/alltypes.sbdf")
+        with tempfile.TemporaryDirectory() as tempdir:
+            sbdf.export_data(dataframe, tempdir + "\\test.sbdf")
+            df2 = sbdf.import_data(tempdir + "\\test.sbdf")
+            self.assertTrue(dataframe.equals(df2))
