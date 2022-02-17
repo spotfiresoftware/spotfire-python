@@ -5,8 +5,9 @@
 # pylint: skip-file
 import sys
 
-from setuptools import setup, find_packages, Extension
-from Cython.Build import cythonize
+from setuptools import setup, find_packages
+from Cython.Distutils import Extension
+from Cython.Distutils.old_build_ext import old_build_ext as build_ext
 
 
 def get_requires(filename):
@@ -36,7 +37,8 @@ extensions = [
     Extension("spotfire.codesign",
               sources=["spotfire/codesign.pyx"],
               include_dirs=codesign_includes,
-              libraries=codesign_libraries
+              libraries=codesign_libraries,
+              cython_c_in_temp=True,
               ),
 ]
 
@@ -52,7 +54,8 @@ setup(
     url='https://github.com/TIBCOSoftware/spotfire-python',
     license='BSD 3-Clause License',
     packages=find_packages(exclude=['spotfire.test']),
-    ext_modules=cythonize(extensions, annotate=True),
+    ext_modules=extensions,
+    cmdclass={'build_ext': build_ext},
     include_package_data=True,
     install_requires=project_requirements,
     python_requires='>=3.7',
