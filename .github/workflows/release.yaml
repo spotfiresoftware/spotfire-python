@@ -1,0 +1,109 @@
+name: Release Package to PyPI
+on:
+  release:
+    types:
+      - published
+permissions:
+  contents: write
+jobs:
+  build-sdist:
+    name: Build Final Release Source Dist
+    runs-on: ubuntu-latest
+    if: ${{ github.event.release.prerelease }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set Up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - name: Install Tools
+        run: |
+          python -m pip install --upgrade pip
+          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > pyproj-requires.txt
+          pip install -r pyproject-requires.txt
+      - name: Build Source Dist
+        run: |
+          python setup.py sdist
+      - uses: actions/upload-artifact@v2
+        with:
+          name: sdist
+          path: 'dist/**'
+      - name: Dynamic Elements
+        id: dynamic
+        run: |
+          echo -n "::set-output name=pythons::" > dynamic.txt
+          cat .github/python-versions.json >> dynamic.txt
+          cat dynamic.txt
+    outputs:
+      python-versions: ${{ steps.dynamic.outputs.pythons }}
+  build-wheel:
+    name: Build Final Release Wheels
+    needs: build-sdist
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        python-version: ${{ fromJson(needs.build-sdist.outputs.python-versions) }}
+        operating-system: [ 'ubuntu-latest', 'windows-latest' ]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set Up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Build Requirements
+        run: |
+          python -m pip install --upgrade pip
+          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > pyproj-requires.txt
+          pip install auditwheel -r pyproj-requires.txt
+      - name: Build Wheel
+        run: |
+          python setup.py bdist_wheel
+      - name: Convert Wheel to Manylinux
+        if: ${{ matrix.operating-system == 'ubuntu-latest' }}
+        run: |
+          mv dist/*.whl .
+          auditwheel repair -w dist ./*.whl
+      - uses: actions/upload-artifact@v2
+        with:
+          name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
+          path: 'dist/**'
+  release:
+    name: Finalize GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-wheel
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          path: dist
+      - name: Set Up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - name: Install Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install twine
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          twine upload $(find dist -type f)
+      - name: Upload to GitHub Release
+        run: |
+          UPLOAD_URL=$(echo "${{ github.event.release.upload_url }}" | sed -e 's/{.*}//')
+          for i in $(find dist -name *.whl); do
+            curl --fail --request POST --url ${UPLOAD_URL}?name=$(basename $i) \
+              --header "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              --header "Accept: application/vnd.github.v3+json" \
+              --data @$i
+          done
+      - name: Finalize GitHub Release
+        run: |
+          # Make the release not a pre-release
+          curl --fail --request PATCH --url ${{ github.event.release.url }} \
+            --header "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            --header "Content-Type: application/json" \
+            --header "Accept: application/vnd.github.v3+json" \
+            --data "{\"prerelease\":false}"
