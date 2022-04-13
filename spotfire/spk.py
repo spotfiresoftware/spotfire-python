@@ -387,7 +387,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             for root, directory_names, _ in os.walk(tempdir):
                 for directory_name in directory_names:
                     # look for the `dist-info` directory for each package
-                    if directory_name.startswith(package_name) and directory_name.endswith('dist-info'):
+                    if re.search(rf'^{package_name}-.*\.dist-info$', directory_name):
                         package_directories.add(directory_name)
                         # Go through the RECORD file from the package dist-info and delete each listed file
                         record_file = os.path.join(root, directory_name, 'RECORD')
