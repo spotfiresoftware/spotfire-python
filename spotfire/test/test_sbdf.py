@@ -157,7 +157,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_write_nullable_dtypes(self):
         """We should be able to write all nullable column dtypes."""
-        df = pandas.DataFrame({
+        dataframe = pandas.DataFrame({
             'b': pandas.Series([True, False, pandas.NA], dtype='boolean'),
             'i': pandas.Series([1, pandas.NA, 3], dtype='Int32'),
             'l': pandas.Series([pandas.NA, 5, 6], dtype='Int64'),
@@ -165,7 +165,7 @@ class SbdfTest(unittest.TestCase):
             'd': pandas.Series([10., pandas.NA, 12.], dtype='Float64')
         })
         with tempfile.TemporaryDirectory() as tempdir:
-            sbdf.export_data(df, tempdir + "/test.sbdf")
+            sbdf.export_data(dataframe, tempdir + "/test.sbdf")
             df2 = sbdf.import_data(tempdir + "/test.sbdf")
             self.assertTrue(pandas.isna(df2.at[2, 'b']))
             self.assertTrue(pandas.isna(df2.at[1, 'i']))
