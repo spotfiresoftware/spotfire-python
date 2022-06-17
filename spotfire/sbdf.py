@@ -1020,12 +1020,15 @@ class _ValueTypeId(enum.IntEnum):
             return _ValueTypeId.infer_from_dtype(series.astype(series.cat.categories.dtype), series_description)
         typeid = {
             "bool": _ValueTypeId.BOOL,
+            "boolean": _ValueTypeId.BOOL,
             "int32": _ValueTypeId.INT,
             "Int32": _ValueTypeId.INT,
             "int64": _ValueTypeId.LONG,
             "Int64": _ValueTypeId.LONG,
             "float32": _ValueTypeId.FLOAT,
+            "Float32": _ValueTypeId.FLOAT,
             "float64": _ValueTypeId.DOUBLE,
+            "Float64": _ValueTypeId.DOUBLE,
             "datetime64[ns]": _ValueTypeId.DATETIME,
             "timedelta64[ns]": _ValueTypeId.TIMESPAN,
             "string": _ValueTypeId.STRING,
