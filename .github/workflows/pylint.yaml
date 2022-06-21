@@ -17,4 +17,4 @@ jobs:
           pip install PyGithub pylint
       - name: Run PyLint
         run: |
-          python .github/scripts/run_pylint_check.py --repo ${{ github.repository }} --label automated/pylint --src spotfire
+          python .github/scripts/run_pylint_check.py --token ${{ secrets.GITHUB_TOKEN }} --repo ${{ github.repository }} --label automated/pylint --src spotfire

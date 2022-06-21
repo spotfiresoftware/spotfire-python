@@ -23,12 +23,13 @@ def main():
     # Process command line arguments
     parser = argparse.ArgumentParser(
         "Check if any opened issues have been closed, run pylint, and open an issue if pylint complains")
+    parser.add_argument("--token", help="The GitHub API token to use")
     parser.add_argument("--repo", help="The owner and repository we are operating on")
     parser.add_argument("--label", help="The name of the GitHub label for generated issues")
     parser.add_argument("--src", help="The source directory to run pylint on")
     args = parser.parse_args()
     # Connect to GitHub REST API
-    gh = Github(os.environ['GITHUB_TOKEN'])
+    gh = Github(args.token)
     # Determine if we should run pylint
     open_issues = gh.search_issues(f"repo:{args.repo} label:{args.label} is:issue is:open")
     if open_issues.totalCount != 0:
