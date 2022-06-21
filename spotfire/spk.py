@@ -23,6 +23,7 @@ from xml.etree import ElementTree
 import zipfile
 
 from pip._vendor.packaging import version as pip_version
+import pkg_resources
 
 import spotfire
 import spotfire.version
@@ -361,7 +362,6 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         # Disable Pylint `Too many nested blocks`
         # pylint: disable=too-many-nested-blocks,too-many-locals
         # Use the spotfire requirements file as a deny list.
-        _message(f"{spotfire.__path__[0]}")
         if "spotfire.zip" in spotfire.__path__[0]:
             # Handle getting the requirements.txt from a zip file.
             with zipfile.ZipFile(os.path.split(spotfire.__path__[0])[0]) as zfile:
@@ -379,10 +379,10 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         # Go through each package
         for package_name in deny_list:
             # Remove version numbers from package name and keep a copy of the original name
-            package_name = package_name.split(' ', 1)[0]
-            original_package_name = package_name
+            package_req = pkg_resources.Requirement.parse(package_name)
+            original_package_name = package_req.project_name
             # Convert dash to underscore for file access
-            package_name = package_name.replace('-', '_')
+            package_name = package_req.project_name.replace('-', '_')
             # Walk through each directory
             for root, directory_names, _ in os.walk(tempdir):
                 for directory_name in directory_names:

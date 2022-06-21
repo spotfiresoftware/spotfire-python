@@ -1,6 +1,6 @@
 bitstring
-numpy >=1.21
-pandas >=0.24.0,!=1.0.2,!=1.0.3
+numpy>=1.21
+pandas>=0.24.0,!=1.0.2,!=1.0.3
 pip
 python-dateutil
 pytz
