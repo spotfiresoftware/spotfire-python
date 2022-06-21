@@ -1436,6 +1436,10 @@ if gpd is not None:
         if not isinstance(gdf.get("geometry")[0], shp_geom.BaseGeometry):
             return gdf
 
+        # Save CRS before manipulating gdf, as geopandas >= 0.11.0 disallows fetching it
+        # after dropping the geometry column
+        saved_crs = gdf.crs
+
         # Write geocoding column metadata
         cols = ["XMin", "XMax", "YMin", "YMax", "XCenter", "YCenter", "Geometry"]
         metacols = list(gdf.columns.drop('geometry'))
@@ -1478,14 +1482,14 @@ if gpd is not None:
             table_metadata["MapChart.GeometryType"] = "Polygon"
         else:
             raise SBDFError("cannot convert collections of Shapely objects")
-        if gdf.crs is not None:
+        if saved_crs is not None:
             try:
-                table_metadata["MapChart.GeographicCrs"] = gdf.crs.to_string()
+                table_metadata["MapChart.GeographicCrs"] = saved_crs.to_string()
             except AttributeError:
                 # GeoPandas <= 0.6.3 compatibility
-                if gdf.crs.startswith("+init="):
-                    gdf.crs = gdf.crs[6:]
-                table_metadata["MapChart.GeographicCrs"] = gdf.crs
+                if saved_crs.startswith("+init="):
+                    saved_crs = saved_crs[6:]
+                table_metadata["MapChart.GeographicCrs"] = saved_crs
         return dframe
 
 
