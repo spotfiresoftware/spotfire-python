@@ -767,6 +767,7 @@ def python(args, hook=None) -> None:
              ])
 def packages(args) -> None:
     """Package a list of Python packages as an SPK package"""
+    # pylint: disable=too-many-statements
 
     def cleanup():
         """Dummy cleanup function."""
@@ -850,6 +851,7 @@ def _promote_brand(brand, analyst):
 
 
 def _handle_versioning(package_builder, installed_packages, brand, brand_subkey, version, force, versioned_filename):
+    # pylint: disable=too-many-arguments
     package_builder.version = _SpkVersion()
     if "BuiltVersion" in brand[brand_subkey]:
         package_builder.version = _SpkVersion.from_str(brand[brand_subkey]["BuiltVersion"])
