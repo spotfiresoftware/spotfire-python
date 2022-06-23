@@ -780,17 +780,19 @@ def packages(args) -> None:
             package_builder.cert_password = getattr(args, "password")
             package_builder.timestamp_url = getattr(args, "timestamp")
             package_builder.sha256 = getattr(args, "sha256")
+            brand_subkey = "Analyst"
         else:
             package_builder = _ZipPackageBuilder()
             package_builder.chmod_script_name = "packages_chmod"
+            brand_subkey = "Server"
         package_builder.output = getattr(args, "spk-file")
         requirements_file = getattr(args, "requirements")
-        brand = _read_brand(requirements_file, "## spotfire.spk: ")
+        brand = _promote_brand(_read_brand(requirements_file, "## spotfire.spk: "), analyst)
         version = getattr(args, "version")
         force = getattr(args, "force")
         versioned_filename = getattr(args, "versioned_filename")
-        name = getattr(args, "name") or brand.get("BuiltName")
-        pkg_id = brand.get("BuiltId")
+        name = getattr(args, "name") or brand[brand_subkey].get("BuiltName")
+        pkg_id = brand[brand_subkey].get("BuiltId")
 
         # If name and id are not in the brand or given on the command line, generate reasonable defaults
         if name is None:
@@ -816,32 +818,45 @@ def packages(args) -> None:
                                                                             prefix_direct, True)
 
         # Based on the packages we installed, determine how to increment the version number
-        _handle_versioning(package_builder, installed_packages, brand, version, force, versioned_filename)
+        _handle_versioning(package_builder, installed_packages, brand, brand_subkey, version, force, versioned_filename)
 
         # Build the package
         package_builder.build()
 
         # Now prepare the brand with the results of the build and apply it to our requirements file
-        brand["BuiltBy"] = sys.version
-        brand["BuiltAt"] = time.asctime(time.localtime(os.path.getmtime(package_builder.output)))
-        brand["BuiltFile"] = package_builder.output
-        brand["BuiltName"] = package_builder.name
-        brand["BuiltId"] = package_builder.id
-        brand["BuiltVersion"] = str(package_builder.version)
-        brand["BuiltPackages"] = installed_packages
+        brand[brand_subkey]["BuiltBy"] = sys.version
+        brand[brand_subkey]["BuiltAt"] = time.asctime(time.localtime(os.path.getmtime(package_builder.output)))
+        brand[brand_subkey]["BuiltFile"] = package_builder.output
+        brand[brand_subkey]["BuiltName"] = package_builder.name
+        brand[brand_subkey]["BuiltId"] = package_builder.id
+        brand[brand_subkey]["BuiltVersion"] = str(package_builder.version)
+        brand[brand_subkey]["BuiltPackages"] = installed_packages
         _brand_file(requirements_file, brand, "## spotfire.spk: ")
     finally:
         cleanup()
 
 
-def _handle_versioning(package_builder, installed_packages, brand, version, force, versioned_filename):
+def _promote_brand(brand, analyst):
+    brand_version = brand.get("BrandVersion") or 1
+
+    # Promote 1 to 2
+    if brand_version < 2:
+        if analyst:
+            brand = {"BrandVersion": 2, "Analyst": brand, "Server": {}}
+        else:
+            brand = {"BrandVersion": 2, "Analyst": {}, "Server": brand}
+
+    return brand
+
+
+def _handle_versioning(package_builder, installed_packages, brand, brand_subkey, version, force, versioned_filename):
     package_builder.version = _SpkVersion()
-    if "BuiltVersion" in brand:
-        package_builder.version = _SpkVersion.from_str(brand["BuiltVersion"])
+    if "BuiltVersion" in brand[brand_subkey]:
+        package_builder.version = _SpkVersion.from_str(brand[brand_subkey]["BuiltVersion"])
         package_builder.version.increment_minor()
-        if "BuiltPackages" in brand:
+        if "BuiltPackages" in brand[brand_subkey]:
             # Tick the major version if required
-            if _should_increment_major(brand["BuiltPackages"], installed_packages, force):
+            if _should_increment_major(brand[brand_subkey]["BuiltPackages"], installed_packages, force):
                 package_builder.version.increment_major()
     # Handle manually specified version numbers
     if version:
