@@ -592,7 +592,7 @@ class _ZipPackageBuilder(_PackageBuilder):
                 payload_script.insert(0, "#!/bin/sh\n")
                 payload.writestr(f"root/Tools/Update/{self.chmod_script_name}.sh", "".join(payload_script))
                 ElementTree.SubElement(metadata_files, "File", {
-                    "TargetRelativePath": f"root\\Tools\\Update\\{self.chmod_script_name}",
+                    "TargetRelativePath": f"root\\Tools\\Update\\{self.chmod_script_name}.sh",
                     "LastModifiedDate": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
