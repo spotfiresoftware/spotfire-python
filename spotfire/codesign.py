@@ -89,7 +89,7 @@ if sys.platform == "win32":
     # Parameter declarations
     def _wrap_function(lib, function_name, restype, argtypes):
         """Simplify wrapping ctypes functions"""
-        func = lib.__getattr__(function_name)
+        func = getattr(lib, function_name)
         func.restype = restype
         func.argtypes = argtypes
         return func
