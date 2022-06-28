@@ -291,6 +291,8 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :return: a function that cleans up the temporarily installed packages, and a dict that maps the names of
         pip packages that were scanned into the SPK package to their installed versions
         """
+        # pylint: disable=too-many-locals,subprocess-run-check
+
         tempdir = tempfile.mkdtemp(prefix="spk")
         self.last_scan_dir = tempdir
 
