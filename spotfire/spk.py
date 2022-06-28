@@ -9,6 +9,7 @@ import argparse
 import datetime
 import io
 import json
+import locale
 import os
 import platform
 import re
@@ -156,28 +157,6 @@ class _SpkVersion:
         return self._versions < other._versions  # pylint: disable=protected-access
 
 
-def _tee(command: typing.List[str], encoding: str = "utf-8") -> typing.List[str]:
-    """Run an external command, capturing the output and displaying it to standard output.  Standard error is collapsed
-    into the same stream as standard output.
-
-    :param command: the command to run
-    :param encoding: the encoding to use to convert the bytes of the command's output into str
-    :return: a list of the lines of the command's output
-    :raises CalledProcessError: if the command returns a non-zero exit status
-    """
-    output = []
-    sys.stdout.flush()
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as process:
-        for line in process.stdout:
-            line = line.decode(encoding)
-            output.append(line)
-            sys.stdout.write(line)
-        return_code = process.wait()
-        if return_code:
-            raise subprocess.CalledProcessError(return_code, command[0])
-        return output
-
-
 def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int = 72) -> None:
     """Brand a file with the JSON representation of data.
 
@@ -321,19 +300,26 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
 
         # Install the packages from the requirement file into tempdir.
         _message(f"Installing pip packages from {requirements} to temporary location.")
-        try:
-            command = [sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
-                             "--target", tempdir, "--requirement", requirements]
-            if constraint:
-                command.extend(["--constraint", constraint])
-            pip_output = _tee(command)
-        except subprocess.CalledProcessError:
+        command = [sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
+                   "--target", tempdir, "--requirement", requirements]
+        if constraint:
+            command.extend(["--constraint", constraint])
+        pip_install = subprocess.run(command)
+        if pip_install.returncode != 0:
             _error("Error installing required packages.  Aborting.")
             cleanup()
             sys.exit(1)
 
-        # Update the brand with the package versions.
-        package_versions = self._packages_installed(pip_output)
+        # List packages that were installed.
+        command = [sys.executable, "-m", "pip", "list", "--disable-pip-version-check", "--path", tempdir,
+                   "--format", "json"]
+        pip_list = subprocess.run(command, capture_output=True)
+        if pip_list.returncode != 0:
+            _error("Error installing required packages.  Aborting.")
+            cleanup()
+            sys.exit(1)
+        package_versions_json = json.loads(pip_list.stdout.decode(locale.getpreferredencoding()))
+        package_versions = {x['name']: x['version'] for x in package_versions_json}
 
         # Delete duplicate packages if needed
         if use_deny_list:
@@ -423,24 +409,6 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 except OSError:
                     _message(f"Unable to remove directory {package_directory_file}")
         _message("Completed removing files and directories for packages on the deny list.")
-        return package_versions
-
-    @staticmethod
-    def _packages_installed(pip_output):
-        """Determine what packages were installed by parsing pip's output."""
-        _installed = "Successfully installed "
-        # Scan the output for the line with the magic string
-        installed_line = None
-        for i in reversed(pip_output):
-            if i.startswith(_installed):
-                installed_line = i
-        # Now parse the line to get the package versions
-        package_versions = {}
-        if installed_line:
-            installed_packages = installed_line[len(_installed):]
-            for pkg in installed_packages.strip().split(" "):
-                pkg_dash_pos = pkg.rfind("-")
-                package_versions[pkg[:pkg_dash_pos]] = pkg[pkg_dash_pos + 1:]
         return package_versions
 
     @abc.abstractmethod
