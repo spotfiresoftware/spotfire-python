@@ -1481,6 +1481,8 @@ if gpd is not None:
         elif all(isinstance(x, shapely.geometry.LineString) for x in geom_series) or \
                 all(isinstance(x, shapely.geometry.LinearRing) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Line"
+        elif all(isinstance(x, shapely.geometry.MultiLineString) for x in geom_series):
+            table_metadata["MapChart.GeometryType"] = "PolyLine"
         elif all(isinstance(x, shapely.geometry.Polygon) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Polygon"
         else:
