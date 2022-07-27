@@ -73,7 +73,7 @@ def import_data(sbdf_file: typing.Union[str, bytes, int]) -> pd.DataFrame:
         table_metadata_dict = _import_table_metadata(tmeta)
 
         # Process column metadata
-        pd_data, pd_dtypes, column_metadata_dict, column_names = _import_column_metadata(tmeta)
+        pd_data, pd_dtypes, spotfire_types, column_metadata_dict, column_names = _import_column_metadata(tmeta)
 
         # Read the table slices
         _import_table_slices(file, column_names, pd_data, tmeta)
@@ -85,6 +85,7 @@ def import_data(sbdf_file: typing.Union[str, bytes, int]) -> pd.DataFrame:
         dataframe = pd.concat(columns, axis=1)
         for col in column_names:
             dataframe[col].spotfire_column_metadata = column_metadata_dict[col]
+            dataframe[col].attrs['spotfire_type'] = spotfire_types[col]
         if gpd is not None and table_metadata_dict.get('MapChart.IsGeocodingTable'):
             dataframe = _data_frame_to_geo_data_frame(dataframe, table_metadata_dict)
         with warnings.catch_warnings():
@@ -102,10 +103,12 @@ def _import_table_metadata(tmeta: '_TableMetadata') -> typing.Dict[str, typing.A
 
 def _import_column_metadata(tmeta: '_TableMetadata') -> typing.Tuple[typing.Dict[str, typing.List],
                                                                      typing.Dict[str, str],
+                                                                     typing.Dict[str, str],
                                                                      typing.Dict[str, typing.Dict[str, typing.Any]],
                                                                      typing.List[str]]:
     pd_data = {}
     pd_dtypes = {}
+    spotfire_types = {}
     column_metadata_dict = {}
     column_names = []
     for i in range(tmeta.column_count()):
@@ -118,8 +121,12 @@ def _import_column_metadata(tmeta: '_TableMetadata') -> typing.Tuple[typing.Dict
         # add a new list to hold the column
         pd_data[cm_column_name] = []
 
+        # get the Spotfire type for the column
+        sbdf_type = _ColumnMetadata.get_type(cmeta)
+        spotfire_types[cm_column_name] = sbdf_type.to_typename_string()
+
         # get the pandas dtype for constructing this column
-        pd_dtypes[cm_column_name] = _ColumnMetadata.get_type(cmeta).to_dtype_name()
+        pd_dtypes[cm_column_name] = sbdf_type.to_dtype_name()
 
         # get the remaining column metadata
         cm_dict = {}
@@ -129,7 +136,7 @@ def _import_column_metadata(tmeta: '_TableMetadata') -> typing.Tuple[typing.Dict
             cm_dict[cmeta.names[j]] = cmeta.values[j].data
         column_metadata_dict[cm_column_name] = cm_dict
 
-    return pd_data, pd_dtypes, column_metadata_dict, column_names
+    return pd_data, pd_dtypes, spotfire_types, column_metadata_dict, column_names
 
 
 def _import_table_slices(file: typing.BinaryIO, column_names: typing.List[str],
@@ -173,7 +180,10 @@ def export_data(obj: typing.Any, sbdf_file: typing.Union[str, bytes, int], defau
         tmeta.write(file)
 
         # Write out the table and column slices
-        _export_table_slices(columns, column_names, column_types, file, row_count, tmeta)
+        try:
+            _export_table_slices(columns, column_names, column_types, file, row_count, tmeta)
+        except Exception as exc:
+            raise SBDFError("Failure while exporting data") from exc
 
 
 def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
@@ -205,8 +215,7 @@ def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
 
         if len({str(x) for x in obj.keys()}) != len(obj.columns):
             raise SBDFError("obj does not have unique column names")
-        # columns = obj.to_dict("list")
-        columns = obj
+        columns = obj.to_dict("list")
         column_names = obj.columns.tolist()
         column_types = {str(k): _ValueTypeId.infer_from_dtype(v, f"column '{str(k)}'") for (k, v) in obj.iteritems()}
     elif isinstance(obj, pd.Series):
@@ -304,36 +313,21 @@ def _export_column_metadata(columns: typing.Dict[str, typing.List], column_names
 def _export_table_slices(columns: typing.Dict[str, typing.List], column_names: typing.List[str],
                          column_types: typing.Dict[str, '_ValueTypeId'], file: typing.BinaryIO,
                          row_count: int, tmeta: '_TableMetadata') -> None:
-    # max_rows_per_slice = max(10, 100000 // max(1, len(column_names)))
-    max_rows_per_slice = 50000
+    max_rows_per_slice = max(10, 100000 // max(1, len(column_names)))
     row_offset = 0
     while row_offset < row_count:
         slice_row_count = min(max_rows_per_slice, row_count - row_offset)
         tslice = _TableSlice(tmeta)
         for colname in column_names:
-            if isinstance(columns, pd.DataFrame):
-                dataslice = columns.loc[row_offset:row_offset + slice_row_count, colname]
-            else:
-                dataslice = columns[colname][row_offset:row_offset + slice_row_count]
-            obj = _SbdfObject(column_types.get(str(colname)), dataslice)
+            obj = _SbdfObject(column_types.get(str(colname)), columns[colname][row_offset:row_offset + slice_row_count])
             cslice = _ColumnSlice(_ValueArray(_ValueArrayEncoding.PLAIN_ARRAY, obj))
-
-            if isinstance(dataslice, pd.Series):
-                invalid = dataslice.isna()
-                if invalid.sum() > 0:
-                    obj_vt = _ValueType(column_types.get(str(colname)))
-                    dataslice = dataslice.fillna(obj_vt.missing_value())
-                    obj_empty = _SbdfObject(_ValueTypeId.BOOL, invalid.tolist())
-                    va_empty = _ValueArray(_ValueArrayEncoding.BIT_ARRAY, obj_empty)
-                    cslice.add_property(_ColumnSlice.ValueProperty_IsInvalid, va_empty)
-            else:
-                invalid = [pd.isnull(x) for x in obj.data]
-                if any(invalid):
-                    obj_vt = _ValueType(column_types.get(str(colname)))
-                    obj.data = [obj_vt.missing_value() if missing else val for val, missing in zip(obj.data, invalid)]
-                    obj_empty = _SbdfObject(_ValueTypeId.BOOL, invalid)
-                    va_empty = _ValueArray(_ValueArrayEncoding.BIT_ARRAY, obj_empty)
-                    cslice.add_property(_ColumnSlice.ValueProperty_IsInvalid, va_empty)
+            invalid = [pd.isnull(x) for x in obj.data]
+            if any(invalid):
+                obj_vt = _ValueType(column_types.get(str(colname)))
+                obj.data = [obj_vt.missing_value() if missing else val for val, missing in zip(obj.data, invalid)]
+                obj_empty = _SbdfObject(_ValueTypeId.BOOL, invalid)
+                va_empty = _ValueArray(_ValueArrayEncoding.BIT_ARRAY, obj_empty)
+                cslice.add_property(_ColumnSlice.ValueProperty_IsInvalid, va_empty)
             tslice.add(cslice)
         tslice.write(file)
         row_offset += slice_row_count
@@ -729,59 +723,36 @@ class _SbdfObject:
         """writes the object to the specified file. valuetype information is not written"""
         self._write_n(file, 1, False)
 
-    # pylint: disable=too-many-branches
     def _write_n(self, file: typing.BinaryIO, n: int, packed: bool) -> None:
         valtype = _ValueType(self.valuetype)
         if valtype.is_array():
             byte_size = 0
-            # packed: no need to write 7bit packed int32
             if packed:
-                if isinstance(self.data, pd.Series) and self.valuetype is not _ValueTypeId.BINARY:
-                    barr = self.data.values.astype('U')
-                    _write_int32(file, sum(_get_7bit_packed_length(len(s.encode("utf-8"))) +
-                                            len(s.encode("utf-8")) for s in barr))
-                    for bstr in barr:
-                        bstr = bstr.encode("utf-8")
-                        _write_7bit_packed_int32(file, len(bstr))
-                        if len(bstr):
-                            _write_bytes(file, bstr)
-                else:
-                    saved_bytes = []
-                    for i in range(n):
-                        saved_bytes.append(valtype.to_bytes(self.data[i]))
-                        length = len(saved_bytes[i])
-                        byte_size += _get_7bit_packed_length(length) + length
-                    _write_int32(file, byte_size)
-                    for i in range(n):
-                        length = len(saved_bytes[i])
-                        _write_7bit_packed_int32(file, length)
-                        if length:
-                            _write_bytes(file, saved_bytes[i])
+                saved_bytes = []
+                for i in range(n):
+                    saved_bytes.append(valtype.to_bytes(self.data[i]))
+                    length = len(saved_bytes[i])
+                    byte_size += _get_7bit_packed_length(length) + length
+                _write_int32(file, byte_size)
+                for i in range(n):
+                    length = len(saved_bytes[i])
+                    _write_7bit_packed_int32(file, length)
+                    if length:
+                        _write_bytes(file, saved_bytes[i])
             else:
-                if isinstance(self.data, pd.Series):
-                    barr = self.data.values.astype('S')
-                    for bstr in barr:
-                        _write_7bit_packed_int32(file, len(bstr))
-                        if len(bstr):
-                            _write_bytes(file, bstr)
-                else:
-                    for i in range(n):
-                        valtype_bytes = valtype.to_bytes(self.data[i])
-                        length = len(valtype_bytes)
-                        _write_int32(file, length)
-                        if length:
-                            _write_bytes(file, valtype_bytes)
+                for i in range(n):
+                    valtype_bytes = valtype.to_bytes(self.data[i])
+                    length = len(valtype_bytes)
+                    _write_int32(file, length)
+                    if length:
+                        _write_bytes(file, valtype_bytes)
         else:
             size = valtype.get_packed_size()
             if size is None:
                 raise SBDFError("unknown typeid")
-
-            if isinstance(self.data, pd.Series) and isinstance(self.data.values, np.ndarray):
-                _write_bytes(file, self.data.values.tobytes())
-            else:
-                for i in range(n):
-                    valtype_bytes = valtype.to_bytes(self.data[i])
-                    _write_bytes(file, valtype_bytes)
+            for i in range(n):
+                valtype_bytes = valtype.to_bytes(self.data[i])
+                _write_bytes(file, valtype_bytes)
 
     @classmethod
     def read_array(cls, file: typing.BinaryIO, valuetype: '_ValueType') -> '_SbdfObject':
@@ -1005,6 +976,24 @@ class _ValueTypeId(enum.IntEnum):
             _ValueTypeId.DECIMAL: "Currency"
         }.get(self, "unknown")
 
+    @staticmethod
+    def from_typename_string(typename: str) -> '_ValueTypeId':
+        """convert the type name used by Spotfire to a valuetype id"""
+        return {
+            "Boolean": _ValueTypeId.BOOL,
+            "Integer": _ValueTypeId.INT,
+            "LongInteger": _ValueTypeId.LONG,
+            "SingleReal": _ValueTypeId.FLOAT,
+            "Real": _ValueTypeId.DOUBLE,
+            "DateTime": _ValueTypeId.DATETIME,
+            "Date": _ValueTypeId.DATE,
+            "Time": _ValueTypeId.TIME,
+            "TimeSpan": _ValueTypeId.TIMESPAN,
+            "String": _ValueTypeId.STRING,
+            "Binary": _ValueTypeId.BINARY,
+            "Currency": _ValueTypeId.DECIMAL
+        }.get(typename)
+
     def to_dtype_name(self) -> str:
         """convert this valuetype id to the dtype name used by Pandas"""
         return {
@@ -1018,10 +1007,7 @@ class _ValueTypeId(enum.IntEnum):
     def infer_from_type(values, value_description: str) -> '_ValueTypeId':
         """determine the proper valuetype id from the Python types in a column"""
         # Remove any None (or other none-ish things) from values
-        if isinstance(values, pd.Series):
-            vals = values.dropna().tolist()
-        else:
-            vals = [x for x in values if not pd.isnull(x)]
+        vals = [x for x in values if not pd.isnull(x)]
         # Check if any values remain
         if not vals:
             raise SBDFError(f"cannot determine type for {value_description}; all values are missing")
@@ -1055,19 +1041,30 @@ class _ValueTypeId(enum.IntEnum):
     @staticmethod
     def infer_from_dtype(series: pd.Series, series_description: str) -> '_ValueTypeId':
         """determine the proper valuetype id from the Pandas dtype of a series"""
+        # use explicitly set type info if present
+        sbdf_type = None
+        if 'spotfire_type' in series.attrs:
+            sbdf_type = _ValueTypeId.from_typename_string(series.attrs['spotfire_type'])
+        if sbdf_type:
+            return sbdf_type
+
+        # otherwise, infer the type info
         dtype = series.dtype.name
         if dtype == "object":
-            return _ValueTypeId.infer_from_type(series, series_description)
+            return _ValueTypeId.infer_from_type(series.tolist(), series_description)
         if dtype == "category":
             return _ValueTypeId.infer_from_dtype(series.astype(series.cat.categories.dtype), series_description)
         typeid = {
             "bool": _ValueTypeId.BOOL,
+            "boolean": _ValueTypeId.BOOL,
             "int32": _ValueTypeId.INT,
             "Int32": _ValueTypeId.INT,
             "int64": _ValueTypeId.LONG,
             "Int64": _ValueTypeId.LONG,
             "float32": _ValueTypeId.FLOAT,
+            "Float32": _ValueTypeId.FLOAT,
             "float64": _ValueTypeId.DOUBLE,
+            "Float64": _ValueTypeId.DOUBLE,
             "datetime64[ns]": _ValueTypeId.DATETIME,
             "timedelta64[ns]": _ValueTypeId.TIMESPAN,
             "string": _ValueTypeId.STRING,
@@ -1248,7 +1245,7 @@ class _ValueType:
 
     @staticmethod
     def _to_bytes_string(obj: str) -> bytes:
-        return obj.encode("utf-8")
+        return str(obj).encode("utf-8")
 
     @staticmethod
     def _to_bytes_binary(obj: bytes) -> bytes:
@@ -1271,40 +1268,16 @@ class _ValueType:
         return bitstring.pack('uintle:96,pad:17,bits:7,bool,bits:7', coefficient, biased_exponent_bits_high,
                               dec.sign, biased_exponent_bits_low).bytes
 
-    # pylint: disable=no-else-return,too-many-return-statements
     def to_bytes(self, obj: typing.Any) -> bytes:
         """return a SBDF representation of the Python objects"""
         try:
-            name = self.type_id
-            if name == _ValueTypeId.BOOL:
-                return self._to_bytes_bool(obj)
-            elif name == _ValueTypeId.INT:
-                return self._to_bytes_int(obj)
-            elif name == _ValueTypeId.LONG:
-                return self._to_bytes_long(obj)
-            elif name == _ValueTypeId.FLOAT:
-                return self._to_bytes_float(obj)
-            elif name == _ValueTypeId.DOUBLE:
-                return self._to_bytes_double(obj)
-            elif name == _ValueTypeId.DATETIME:
-                return self._to_bytes_datetime(obj)
-            elif name == _ValueTypeId.DATE:
-                return self._to_bytes_date(obj)
-            elif name == _ValueTypeId.TIME:
-                return self._to_bytes_time(obj)
-            elif name == _ValueTypeId.TIMESPAN:
-                return self._to_bytes_timespan(obj)
-            elif name == _ValueTypeId.STRING:
-                return self._to_bytes_string(obj)
-            elif name == _ValueTypeId.BINARY:
-                return obj
-            elif name == _ValueTypeId.DECIMAL:
-                return self._to_bytes_decimal(obj)
-            else:
-                return None
+            return getattr(self, "_to_bytes_" + self.type_id.name.lower(), lambda x: None)(obj)
         except (struct.error, bitstring.CreationError, UnicodeError) as exc:
             raise SBDFError(f"cannot convert '{obj}' to Spotfire {self.type_id.to_typename_string()} \
-            type; value is outside representable range") from exc
+                        type; value is outside representable range") from exc
+        except (AttributeError, TypeError) as exc:
+            raise SBDFError(f"cannot convert '{obj}' to Spotfire {self.type_id.to_typename_string()} \
+                        type; incompatible types") from exc
 
     def missing_value(self) -> typing.Any:
         """return a missing value appropriate for the value type"""
@@ -1505,6 +1478,10 @@ if gpd is not None:
         if not isinstance(gdf.get("geometry")[0], shp_geom.BaseGeometry):
             return gdf
 
+        # Save CRS before manipulating gdf, as geopandas >= 0.11.0 disallows fetching it
+        # after dropping the geometry column
+        saved_crs = gdf.crs
+
         # Write geocoding column metadata
         cols = ["XMin", "XMax", "YMin", "YMax", "XCenter", "YCenter", "Geometry"]
         metacols = list(gdf.columns.drop('geometry'))
@@ -1543,18 +1520,20 @@ if gpd is not None:
         elif all(isinstance(x, shapely.geometry.LineString) for x in geom_series) or \
                 all(isinstance(x, shapely.geometry.LinearRing) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Line"
+        elif all(isinstance(x, shapely.geometry.MultiLineString) for x in geom_series):
+            table_metadata["MapChart.GeometryType"] = "PolyLine"
         elif all(isinstance(x, shapely.geometry.Polygon) for x in geom_series):
             table_metadata["MapChart.GeometryType"] = "Polygon"
         else:
             raise SBDFError("cannot convert collections of Shapely objects")
-        if gdf.crs is not None:
+        if saved_crs is not None:
             try:
-                table_metadata["MapChart.GeographicCrs"] = gdf.crs.to_string()
+                table_metadata["MapChart.GeographicCrs"] = saved_crs.to_string()
             except AttributeError:
                 # GeoPandas <= 0.6.3 compatibility
-                if gdf.crs.startswith("+init="):
-                    gdf.crs = gdf.crs[6:]
-                table_metadata["MapChart.GeographicCrs"] = gdf.crs
+                if saved_crs.startswith("+init="):
+                    saved_crs = saved_crs[6:]
+                table_metadata["MapChart.GeographicCrs"] = saved_crs
         return dframe
 
 

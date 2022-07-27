@@ -9,6 +9,7 @@ import argparse
 import datetime
 import io
 import json
+import locale
 import os
 import platform
 import re
@@ -23,6 +24,7 @@ from xml.etree import ElementTree
 import zipfile
 
 from pip._vendor.packaging import version as pip_version
+import pkg_resources
 
 import spotfire
 import spotfire.version
@@ -153,28 +155,6 @@ class _SpkVersion:
         if not isinstance(other, _SpkVersion):
             return NotImplemented
         return self._versions < other._versions  # pylint: disable=protected-access
-
-
-def _tee(command: typing.List[str], encoding: str = "utf-8") -> typing.List[str]:
-    """Run an external command, capturing the output and displaying it to standard output.  Standard error is collapsed
-    into the same stream as standard output.
-
-    :param command: the command to run
-    :param encoding: the encoding to use to convert the bytes of the command's output into str
-    :return: a list of the lines of the command's output
-    :raises CalledProcessError: if the command returns a non-zero exit status
-    """
-    output = []
-    sys.stdout.flush()
-    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as process:
-        for line in process.stdout:
-            line = line.decode(encoding)
-            output.append(line)
-            sys.stdout.write(line)
-        return_code = process.wait()
-        if return_code:
-            raise subprocess.CalledProcessError(return_code, command[0])
-        return output
 
 
 def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int = 72) -> None:
@@ -311,6 +291,8 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :return: a function that cleans up the temporarily installed packages, and a dict that maps the names of
         pip packages that were scanned into the SPK package to their installed versions
         """
+        # pylint: disable=too-many-locals,subprocess-run-check
+
         tempdir = tempfile.mkdtemp(prefix="spk")
         self.last_scan_dir = tempdir
 
@@ -320,19 +302,26 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
 
         # Install the packages from the requirement file into tempdir.
         _message(f"Installing pip packages from {requirements} to temporary location.")
-        try:
-            command = [sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
-                             "--target", tempdir, "--requirement", requirements]
-            if constraint:
-                command.extend(["--constraint", constraint])
-            pip_output = _tee(command)
-        except subprocess.CalledProcessError:
+        command = [sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
+                   "--target", tempdir, "--requirement", requirements]
+        if constraint:
+            command.extend(["--constraint", constraint])
+        pip_install = subprocess.run(command)
+        if pip_install.returncode != 0:
             _error("Error installing required packages.  Aborting.")
             cleanup()
             sys.exit(1)
 
-        # Update the brand with the package versions.
-        package_versions = self._packages_installed(pip_output)
+        # List packages that were installed.
+        command = [sys.executable, "-m", "pip", "list", "--disable-pip-version-check", "--path", tempdir,
+                   "--format", "json"]
+        pip_list = subprocess.run(command, capture_output=True)
+        if pip_list.returncode != 0:
+            _error("Error installing required packages.  Aborting.")
+            cleanup()
+            sys.exit(1)
+        package_versions_json = json.loads(pip_list.stdout.decode(locale.getpreferredencoding()))
+        package_versions = {x['name']: x['version'] for x in package_versions_json}
 
         # Delete duplicate packages if needed
         if use_deny_list:
@@ -361,7 +350,6 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         # Disable Pylint `Too many nested blocks`
         # pylint: disable=too-many-nested-blocks,too-many-locals
         # Use the spotfire requirements file as a deny list.
-        _message(f"{spotfire.__path__[0]}")
         if "spotfire.zip" in spotfire.__path__[0]:
             # Handle getting the requirements.txt from a zip file.
             with zipfile.ZipFile(os.path.split(spotfire.__path__[0])[0]) as zfile:
@@ -379,15 +367,15 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         # Go through each package
         for package_name in deny_list:
             # Remove version numbers from package name and keep a copy of the original name
-            package_name = package_name.split(' ', 1)[0]
-            original_package_name = package_name
+            package_req = pkg_resources.Requirement.parse(package_name)
+            original_package_name = package_req.project_name
             # Convert dash to underscore for file access
-            package_name = package_name.replace('-', '_')
+            package_name = package_req.project_name.replace('-', '_')
             # Walk through each directory
             for root, directory_names, _ in os.walk(tempdir):
                 for directory_name in directory_names:
                     # look for the `dist-info` directory for each package
-                    if directory_name.startswith(package_name) and directory_name.endswith('dist-info'):
+                    if re.search(rf'^{package_name}-.*\.dist-info$', directory_name):
                         package_directories.add(directory_name)
                         # Go through the RECORD file from the package dist-info and delete each listed file
                         record_file = os.path.join(root, directory_name, 'RECORD')
@@ -423,24 +411,6 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 except OSError:
                     _message(f"Unable to remove directory {package_directory_file}")
         _message("Completed removing files and directories for packages on the deny list.")
-        return package_versions
-
-    @staticmethod
-    def _packages_installed(pip_output):
-        """Determine what packages were installed by parsing pip's output."""
-        _installed = "Successfully installed "
-        # Scan the output for the line with the magic string
-        installed_line = None
-        for i in reversed(pip_output):
-            if i.startswith(_installed):
-                installed_line = i
-        # Now parse the line to get the package versions
-        package_versions = {}
-        if installed_line:
-            installed_packages = installed_line[len(_installed):]
-            for pkg in installed_packages.strip().split(" "):
-                pkg_dash_pos = pkg.rfind("-")
-                package_versions[pkg[:pkg_dash_pos]] = pkg[pkg_dash_pos + 1:]
         return package_versions
 
     @abc.abstractmethod
@@ -592,7 +562,7 @@ class _ZipPackageBuilder(_PackageBuilder):
                 payload_script.insert(0, "#!/bin/sh\n")
                 payload.writestr(f"root/Tools/Update/{self.chmod_script_name}.sh", "".join(payload_script))
                 ElementTree.SubElement(metadata_files, "File", {
-                    "TargetRelativePath": f"root\\Tools\\Update\\{self.chmod_script_name}",
+                    "TargetRelativePath": f"root\\Tools\\Update\\{self.chmod_script_name}.sh",
                     "LastModifiedDate": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
@@ -767,6 +737,7 @@ def python(args, hook=None) -> None:
              ])
 def packages(args) -> None:
     """Package a list of Python packages as an SPK package"""
+    # pylint: disable=too-many-statements
 
     def cleanup():
         """Dummy cleanup function."""
@@ -780,17 +751,19 @@ def packages(args) -> None:
             package_builder.cert_password = getattr(args, "password")
             package_builder.timestamp_url = getattr(args, "timestamp")
             package_builder.sha256 = getattr(args, "sha256")
+            brand_subkey = "Analyst"
         else:
             package_builder = _ZipPackageBuilder()
             package_builder.chmod_script_name = "packages_chmod"
+            brand_subkey = "Server"
         package_builder.output = getattr(args, "spk-file")
         requirements_file = getattr(args, "requirements")
-        brand = _read_brand(requirements_file, "## spotfire.spk: ")
+        brand = _promote_brand(_read_brand(requirements_file, "## spotfire.spk: "), analyst)
         version = getattr(args, "version")
         force = getattr(args, "force")
         versioned_filename = getattr(args, "versioned_filename")
-        name = getattr(args, "name") or brand.get("BuiltName")
-        pkg_id = brand.get("BuiltId")
+        name = getattr(args, "name") or brand[brand_subkey].get("BuiltName")
+        pkg_id = brand[brand_subkey].get("BuiltId")
 
         # If name and id are not in the brand or given on the command line, generate reasonable defaults
         if name is None:
@@ -816,32 +789,46 @@ def packages(args) -> None:
                                                                             prefix_direct, True)
 
         # Based on the packages we installed, determine how to increment the version number
-        _handle_versioning(package_builder, installed_packages, brand, version, force, versioned_filename)
+        _handle_versioning(package_builder, installed_packages, brand, brand_subkey, version, force, versioned_filename)
 
         # Build the package
         package_builder.build()
 
         # Now prepare the brand with the results of the build and apply it to our requirements file
-        brand["BuiltBy"] = sys.version
-        brand["BuiltAt"] = time.asctime(time.localtime(os.path.getmtime(package_builder.output)))
-        brand["BuiltFile"] = package_builder.output
-        brand["BuiltName"] = package_builder.name
-        brand["BuiltId"] = package_builder.id
-        brand["BuiltVersion"] = str(package_builder.version)
-        brand["BuiltPackages"] = installed_packages
+        brand[brand_subkey]["BuiltBy"] = sys.version
+        brand[brand_subkey]["BuiltAt"] = time.asctime(time.localtime(os.path.getmtime(package_builder.output)))
+        brand[brand_subkey]["BuiltFile"] = package_builder.output
+        brand[brand_subkey]["BuiltName"] = package_builder.name
+        brand[brand_subkey]["BuiltId"] = package_builder.id
+        brand[brand_subkey]["BuiltVersion"] = str(package_builder.version)
+        brand[brand_subkey]["BuiltPackages"] = installed_packages
         _brand_file(requirements_file, brand, "## spotfire.spk: ")
     finally:
         cleanup()
 
 
-def _handle_versioning(package_builder, installed_packages, brand, version, force, versioned_filename):
+def _promote_brand(brand, analyst):
+    brand_version = brand.get("BrandVersion") or 1
+
+    # Promote 1 to 2
+    if brand_version < 2:
+        if analyst:
+            brand = {"BrandVersion": 2, "Analyst": brand, "Server": {}}
+        else:
+            brand = {"BrandVersion": 2, "Analyst": {}, "Server": brand}
+
+    return brand
+
+
+def _handle_versioning(package_builder, installed_packages, brand, brand_subkey, version, force, versioned_filename):
+    # pylint: disable=too-many-arguments
     package_builder.version = _SpkVersion()
-    if "BuiltVersion" in brand:
-        package_builder.version = _SpkVersion.from_str(brand["BuiltVersion"])
+    if "BuiltVersion" in brand[brand_subkey]:
+        package_builder.version = _SpkVersion.from_str(brand[brand_subkey]["BuiltVersion"])
         package_builder.version.increment_minor()
-        if "BuiltPackages" in brand:
+        if "BuiltPackages" in brand[brand_subkey]:
             # Tick the major version if required
-            if _should_increment_major(brand["BuiltPackages"], installed_packages, force):
+            if _should_increment_major(brand[brand_subkey]["BuiltPackages"], installed_packages, force):
                 package_builder.version.increment_major()
     # Handle manually specified version numbers
     if version:

@@ -2,8 +2,6 @@ name: Check Current PyLint
 on:
   schedule:
     - cron: '17 17 * * 1'
-permissions:
-  issues: write
 jobs:
   pylint:
     name: Check PyLint
@@ -16,7 +14,7 @@ jobs:
           python-version: '3.x'
       - name: Install Tools
         run: |
-          pip install ghapi pylint
+          pip install PyGithub pylint
       - name: Run PyLint
         run: |
-          python .github/scripts/run_pylint_check.py --repo ${{ github.repository }} --label automated/pylint --src spotfire
+          python .github/scripts/run_pylint_check.py --token ${{ secrets.GITHUB_TOKEN }} --repo ${{ github.repository }} --label automated/pylint --src spotfire
