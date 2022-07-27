@@ -126,24 +126,24 @@ class SbdfTest(unittest.TestCase):
             self.assertEqual(gdf.crs.to_epsg(), 4326)
             self.assertEqual(gdf.crs.to_string(), "EPSG:4326")
             with tempfile.TemporaryDirectory() as tempdir:
-                sbdf.export_data(gdf, tempdir + "\\test.sbdf")
-                gdf2 = sbdf.import_data(tempdir + "\\test.sbdf")
+                sbdf.export_data(gdf, f"{tempdir}/test.sbdf")
+                gdf2 = sbdf.import_data(f"{tempdir}/test.sbdf")
                 self.assertEqual(gdf2.crs.to_epsg(), 4326)
                 self.assertEqual(gdf2.crs.to_string(), "EPSG:4326")
         else:
             # GeoPandas < 0.7.0 compatibility
             self.assertEqual(gdf.crs, "+init=EPSG:4326")
             with tempfile.TemporaryDirectory() as tempdir:
-                sbdf.export_data(gdf, tempdir + "\\test.sbdf")
-                gdf2 = sbdf.import_data(tempdir + "\\test.sbdf")
+                sbdf.export_data(gdf, f"{tempdir}/test.sbdf")
+                gdf2 = sbdf.import_data(f"{tempdir}/test.sbdf")
                 self.assertEqual(gdf2.crs, "+init=EPSG:4326")
 
     def test_write_unicode(self):
         """Test that unicode string arrays are properly written"""
         udf = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/unicode.sbdf")
         with tempfile.TemporaryDirectory() as tempdir:
-            sbdf.export_data(udf, tempdir + "\\test.sbdf")
-            udf2 = sbdf.import_data(tempdir + "\\test.sbdf")
+            sbdf.export_data(udf, f"{tempdir}/test.sbdf")
+            udf2 = sbdf.import_data(f"{tempdir}/test.sbdf")
             for i in range(3):
                 self.assertEqual(udf.at[i, "x"], udf2.at[i, "x"])
 
@@ -151,8 +151,8 @@ class SbdfTest(unittest.TestCase):
         """Test that all data types can be properly roundtripped read/write"""
         dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/alltypes.sbdf")
         with tempfile.TemporaryDirectory() as tempdir:
-            sbdf.export_data(dataframe, tempdir + "\\test.sbdf")
-            df2 = sbdf.import_data(tempdir + "\\test.sbdf")
+            sbdf.export_data(dataframe, f"{tempdir}/test.sbdf")
+            df2 = sbdf.import_data(f"{tempdir}/test.sbdf")
             self.assertTrue(dataframe.equals(df2))
 
     def test_write_nullable_dtypes(self):
@@ -165,8 +165,8 @@ class SbdfTest(unittest.TestCase):
             'd': pandas.Series([10., pandas.NA, 12.], dtype='Float64')
         })
         with tempfile.TemporaryDirectory() as tempdir:
-            sbdf.export_data(dataframe, tempdir + "/test.sbdf")
-            df2 = sbdf.import_data(tempdir + "/test.sbdf")
+            sbdf.export_data(dataframe, f"{tempdir}/test.sbdf")
+            df2 = sbdf.import_data(f"{tempdir}/test.sbdf")
             self.assertTrue(pandas.isna(df2.at[2, 'b']))
             self.assertTrue(pandas.isna(df2.at[1, 'i']))
             self.assertTrue(pandas.isna(df2.at[0, 'l']))
