@@ -400,19 +400,7 @@ class AnalyticSpec:
                             offset = " " * spacer
                             buf.write(f"    {offset}^\n")
                         buf.write(f"{exc_type}: {result.get_exc_info()[1]}\n\n")
-                        buf.write("Traceback (most recent call last):\n")
-                        # get the StackSummary
-                        tb_frames = traceback.extract_tb(result.get_exc_info()[2])
-                        # get the FrameSummary objects from the StackSummary
-                        lines = traceback.format_list(tb_frames)
-
-                        # trim the path from the filename
-                        def shorten(match):
-                            """trim the path from the exception filename"""
-                            return f'File "{os.path.basename(match.group(1))}"'
-
-                        lines = [re.sub(r'File "([^"]+)"', shorten, line, 1) for line in lines]
-                        buf.writelines(lines)
+                        self._create_traceback(buf, result.get_exc_info()[1])
                     except BaseException:
                         buf.write(f"\nCould not retrieve stacktrace: {traceback.print_exc()}")
             if result.get_capture() is not None:
@@ -432,6 +420,33 @@ class AnalyticSpec:
         except SystemError as err:
             buf.write(str(err))
         result.summary = buf.getvalue()
+
+    def _create_traceback(self, buf, exc_val):
+        """Format a traceback as a string that can be displayed to the user."""
+        # print the header
+        buf.write("Traceback (most recent call last):\n")
+
+        # get the StackSummary
+        tb_frames = traceback.extract_tb(exc_val.__traceback__)
+        # get the FrameSummary objects from the StackSummary
+        lines = traceback.format_list(tb_frames)
+
+        # trim the path from the filename
+        def shorten(match):
+            """trim the path from the exception filename"""
+            return f'File "{os.path.basename(match.group(1))}"'
+
+        lines = [re.sub(r'File "([^"]+)"', shorten, line, 1) for line in lines]
+
+        # print the lines
+        buf.writelines(lines)
+
+        # recurse if we have a cause
+        if exc_val.__cause__:
+            buf.write("\nThe following exception was the direct cause of the above exception:\n\n")
+            exc_cause_type = _utils.type_name(type(exc_val.__cause__))
+            self._create_traceback(buf, exc_val.__cause__)
+            buf.write(f"{exc_cause_type}: {exc_val.__cause__}\n")
 
 
 # Exceptions
