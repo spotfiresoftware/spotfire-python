@@ -460,3 +460,24 @@ out1 = out1.rename('b')""", {"in1": in1_series}, {"out1": out1_df}, True, "")
 Standard output:
 None
 """)
+
+    def test_nested_exception(self):
+        """Test a nested exception is properly displayed"""
+        self._run_analytic("""try:
+    raise ValueError("root exception")
+except Exception as e:
+    raise TypeError("parent exception") from e""", {}, {}, False, """Error executing Python script:
+
+TypeError: parent exception
+
+Traceback (most recent call last):
+  File "data_function.py", in _execute_script
+    exec(compiled_script, self.globals)
+  File "<data_function>", in <module>
+
+The following exception was the direct cause of the above exception:
+
+Traceback (most recent call last):
+  File "<data_function>", in <module>
+ValueError: root exception
+""")
