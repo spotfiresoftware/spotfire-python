@@ -3,4 +3,4 @@
 # in the license file that is distributed with this file.
 
 # pylint: skip-file
-__version__="1.8.1"
+__version__="1.8.2"
