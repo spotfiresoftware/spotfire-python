@@ -338,3 +338,14 @@ class SbdfTest(unittest.TestCase):
             new_df = sbdf.import_data(f"{tempdir}/output.sbdf")
             new_df_types = spotfire.get_spotfire_types(new_df)
             return new_df, new_df_types
+
+    def test_column_promotion(self):
+        """Verify promotion of large valued Integer columns correctly promote to LongInteger"""
+        dataframe = pandas.DataFrame({
+            'large': [500400300200, 500400300201, pandas.NA, 500400300203],
+            'small': [0, 1, pandas.NA, 3]
+        })
+        spotfire.set_spotfire_types(dataframe, {'large': 'Integer', 'small': 'Integer'})
+        _, exported_types = self.roundtrip_dataframe(dataframe)
+        self.assertEqual(exported_types['large'], 'LongInteger')
+        self.assertEqual(exported_types['small'], 'Integer')
