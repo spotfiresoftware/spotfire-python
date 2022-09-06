@@ -1045,6 +1045,15 @@ class _ValueTypeId(enum.IntEnum):
         sbdf_type = None
         if 'spotfire_type' in series.attrs:
             sbdf_type = _ValueTypeId.from_typename_string(series.attrs['spotfire_type'])
+            if sbdf_type == _ValueTypeId.INT:
+                int32_info = np.iinfo(np.int32)
+                for i in series:
+                    if isinstance(i, int) and not int32_info.min < i < int32_info.max:
+                        warnings.warn(
+                            f"values in {series_description} do not fit in type 'Integer'; promoting type to "
+                            f"'LongInteger'")
+                        sbdf_type = _ValueTypeId.LONG
+                        break
         if sbdf_type:
             return sbdf_type
 
