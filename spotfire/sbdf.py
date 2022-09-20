@@ -217,7 +217,7 @@ def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
             raise SBDFError("obj does not have unique column names")
         columns = obj.to_dict("list")
         column_names = obj.columns.tolist()
-        column_types = {str(k): _ValueTypeId.infer_from_dtype(v, f"column '{str(k)}'") for (k, v) in obj.iteritems()}
+        column_types = {str(k): _ValueTypeId.infer_from_dtype(v, f"column '{str(k)}'") for (k, v) in obj.items()}
     elif isinstance(obj, pd.Series):
         # Handle series as columnar data
         series_name = default_column_name if obj.name is None else obj.name
