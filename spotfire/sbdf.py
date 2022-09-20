@@ -217,7 +217,7 @@ def _export_columnize_data(obj: typing.Any, default_column_name: str) -> \
             raise SBDFError("obj does not have unique column names")
         columns = obj.to_dict("list")
         column_names = obj.columns.tolist()
-        column_types = {str(k): _ValueTypeId.infer_from_dtype(v, f"column '{str(k)}'") for (k, v) in obj.iteritems()}
+        column_types = {str(k): _ValueTypeId.infer_from_dtype(v, f"column '{str(k)}'") for (k, v) in obj.items()}
     elif isinstance(obj, pd.Series):
         # Handle series as columnar data
         series_name = default_column_name if obj.name is None else obj.name
@@ -1045,6 +1045,15 @@ class _ValueTypeId(enum.IntEnum):
         sbdf_type = None
         if 'spotfire_type' in series.attrs:
             sbdf_type = _ValueTypeId.from_typename_string(series.attrs['spotfire_type'])
+            if sbdf_type == _ValueTypeId.INT:
+                int32_info = np.iinfo(np.int32)
+                for i in series:
+                    if isinstance(i, int) and not int32_info.min < i < int32_info.max:
+                        warnings.warn(
+                            f"values in {series_description} do not fit in type 'Integer'; promoting type to "
+                            f"'LongInteger'")
+                        sbdf_type = _ValueTypeId.LONG
+                        break
         if sbdf_type:
             return sbdf_type
 
