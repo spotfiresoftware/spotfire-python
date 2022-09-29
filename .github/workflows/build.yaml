@@ -6,6 +6,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Set Up Python
         uses: actions/setup-python@v2
         with:
@@ -48,6 +50,8 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Set Up Python
         uses: actions/setup-python@v2
         with:
@@ -75,6 +79,8 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - uses: actions/download-artifact@v2
         with:
           name: wheel-${{ matrix.python-version }}-ubuntu-latest

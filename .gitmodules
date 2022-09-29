@@ -1,0 +1,3 @@
+[submodule "vendor/sbdf-c"]
+	path = vendor/sbdf-c
+	url = https://github.com/TIBCOSoftware/spotfire-sbdf-c.git
