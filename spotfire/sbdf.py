@@ -1089,6 +1089,7 @@ class _ValueType:
         self.type_id = _ValueTypeId(type_id)
         _to_python = getattr(self, "_to_python_" + self.type_id.name.lower(), lambda _, x: None)
         self.to_python = _to_python
+        self._to_bytes = getattr(self, "_to_bytes_" + self.type_id.name.lower(), lambda _, x: None)
 
     def __repr__(self) -> str:
         return str(self.type_id)
@@ -1284,7 +1285,7 @@ class _ValueType:
     def to_bytes(self, obj: typing.Any) -> bytes:
         """return a SBDF representation of the Python objects"""
         try:
-            return getattr(self, "_to_bytes_" + self.type_id.name.lower(), lambda x: None)(obj)
+            return self._to_bytes(obj)# getattr(self, "_to_bytes_" + self.type_id.name.lower(), lambda x: None)(obj)
         except (struct.error, bitstring.CreationError, UnicodeError) as exc:
             raise SBDFError(f"cannot convert '{obj}' to Spotfire {self.type_id.to_typename_string()} \
                         type; value is outside representable range") from exc
