@@ -10,6 +10,7 @@ import decimal
 import enum
 import struct
 import tempfile
+import types
 import typing
 import warnings
 
@@ -1086,6 +1087,8 @@ class _ValueTypeId(enum.IntEnum):
 class _ValueType:
     def __init__(self, type_id: int) -> None:
         self.type_id = _ValueTypeId(type_id)
+        _to_python = getattr(self, "_to_python_" + self.type_id.name.lower(), lambda _, x: None)
+        self.to_python = _to_python
 
     def __repr__(self) -> str:
         return str(self.type_id)
@@ -1197,7 +1200,8 @@ class _ValueType:
 
     def to_python(self, data: bytes) -> typing.Any:
         """return a Python representation of the raw data"""
-        return getattr(self, "_to_python_" + self.type_id.name.lower(), lambda x: None)(data)
+        #return getattr(self, "_to_python_" + self.type_id.name.lower(), lambda x: None)(data)
+        return self._to_python(data)
 
     @staticmethod
     def _to_bytes_bool(obj: bool) -> bytes:
@@ -1372,8 +1376,8 @@ def _section_expect(file: typing.BinaryIO, section_id: _SectionTypeId) -> None:
 # Internals
 
 def _write_bytes(file: typing.BinaryIO, value: bytes) -> int:
-    if "b" not in file.mode:
-        raise SBDFError("file not opened as binary")
+    # if "b" not in file.mode:
+    #     raise SBDFError("file not opened as binary")
     written = file.write(value)
     if written != len(value):
         raise SBDFError("i/o error")
@@ -1381,8 +1385,8 @@ def _write_bytes(file: typing.BinaryIO, value: bytes) -> int:
 
 
 def _read_bytes(file: typing.BinaryIO, n: int) -> bytes:
-    if "b" not in file.mode:
-        raise SBDFError("file not opened as binary")
+    # if "b" not in file.mode:
+    #     raise SBDFError("file not opened as binary")
     bytes_read = file.read(n)
     if len(bytes_read) != n:
         raise SBDFError("i/o error")
