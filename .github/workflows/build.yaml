@@ -30,12 +30,11 @@ jobs:
       - name: Dynamic Elements
         id: dynamic
         run: |
-          echo -n "::set-output name=test-envs::[" > dynamic.txt
-          ls test_requirements_* | sed -e 's/test_requirements_/"/' -e 's/.txt/"/' | tr '\n' ',' | sed -e 's/,$//' >> dynamic.txt
-          echo "]" >> dynamic.txt
-          echo -n "::set-output name=pythons::" >> dynamic.txt
-          cat .github/python-versions.json >> dynamic.txt
-          cat dynamic.txt
+          echo -n "test-envs=[" >> $GITHUB_OUTPUT
+          ls test_requirements_* | sed -e 's/test_requirements_/"/' -e 's/.txt/"/' | tr '\n' ',' | sed -e 's/,$//' >> $GITHUB_OUTPUT
+          echo "]" >> $GITHUB_OUTPUT
+          echo -n "pythons=" >> $GITHUB_OUTPUT
+          cat .github/python-versions.json >> $GITHUB_OUTPUT
     outputs:
       test-environments: ${{ steps.dynamic.outputs.test-envs }}
       python-versions: ${{ steps.dynamic.outputs.pythons }}
