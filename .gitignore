@@ -1,19 +1,30 @@
 # Cython generated sources
-/spotfire/*.c
+/spotfire/*.[ch]
+!/spotfire/*_helpers.[ch]
 /spotfire/*.html
+/cython_debug/
 
 # byte-compiled files
 __pycache__/
-*.py[cod]
+*.py[co]
+
+# compiler output files
+*.pyd
+*.pdb
+*.so
 
 # unit test results files
 /results-*.xml
+/spotfire/test/output.sbdf
 
 # distribution
 /build/
 /dist/
 /*.egg-info/
 /MANIFEST
+
+# virtual environments
+/venv/
 
 # PyCharm project files
 /.idea

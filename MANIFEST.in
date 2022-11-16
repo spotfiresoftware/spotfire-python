@@ -2,4 +2,11 @@ include LICENSE
 include requirements_dev.txt
 include spotfire/requirements.txt
 include spotfire/*.pyx
+recursive-exclude spotfire/test *
 exclude setup.cfg
+recursive-include vendor *.pxd *.h *.c
+recursive-exclude venv *
+recursive-exclude .github *
+exclude .gitattributes
+exclude .gitignore
+exclude .whitesource*

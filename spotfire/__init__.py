@@ -9,6 +9,7 @@ import warnings
 
 import pandas as pd
 
+# pylint: disable=import-self
 from spotfire import sbdf
 
 
@@ -31,7 +32,10 @@ def copy_metadata(source, destination) -> None:
     if isinstance(source, pd.DataFrame):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            destination.spotfire_table_metadata = source.spotfire_table_metadata
+            try:
+                destination.spotfire_table_metadata = source.spotfire_table_metadata
+            except AttributeError:
+                pass
         for col in source.columns:
             try:
                 source1 = source[col]
@@ -41,7 +45,10 @@ def copy_metadata(source, destination) -> None:
                 pass
     # Handle Series
     elif isinstance(source, pd.Series):
-        destination.spotfire_column_metadata = source.spotfire_column_metadata
+        try:
+            destination.spotfire_column_metadata = source.spotfire_column_metadata
+        except AttributeError:
+            pass
 
 
 # Spotfire type functions
@@ -76,8 +83,7 @@ def set_spotfire_types(dataframe: pd.DataFrame, column_types: typing.Dict[str, s
         if col not in dataframe:
             warnings.warn(f"Column '{col}' not found in data")
             continue
-        # pylint: disable=protected-access
-        if not sbdf._ValueTypeId.from_typename_string(spotfire_type):
-            warnings.warn(f"Spotfire type '{spotfire_type}' for column '{col}' not recognized")
+        if not sbdf.spotfire_typename_to_valuetype_id(spotfire_type):
+            warnings.warn(f"Spotfire type '{spotfire_type}' for column '{col}' not recognized", sbdf.SBDFWarning)
             continue
         dataframe[col].attrs['spotfire_type'] = spotfire_type

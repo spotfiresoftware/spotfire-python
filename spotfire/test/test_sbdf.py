@@ -267,10 +267,35 @@ class SbdfTest(unittest.TestCase):
                       "Integer", "LongInteger", "SingleReal", "Real", "Binary"]
         self.verify_import_export_types(data, default_type, pass_types, fail_types)
 
+    def test_import_export_binary(self):
+        """Verify binary column conversions"""
+        data = [b"apple", b"banana", b"cherry"]
+        default_type = "Binary"
+        pass_types = ["String", "Binary", "Boolean"]
+        fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Currency",
+                      "Integer", "LongInteger", "SingleReal", "Real"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
+    def test_import_export_boolean(self):
+        """Verify boolean column conversions"""
+        data = [True, False]
+        default_type = "Boolean"
+        pass_types = ["String", "Boolean", "Integer", "LongInteger", "SingleReal", "Real"]
+        fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Binary", "Currency"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
     def test_import_export_integer(self):
         """Verify integer column conversions"""
         data = [1, 2, 3]
         default_type = "LongInteger"
+        pass_types = ["String", "Boolean", "Integer", "LongInteger", "SingleReal", "Real"]
+        fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Binary", "Currency"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
+    def test_import_export_float(self):
+        """Verify float column conversions"""
+        data = [1., 2., 3.5]
+        default_type = "Real"
         pass_types = ["String", "Boolean", "Integer", "LongInteger", "SingleReal", "Real"]
         fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Binary", "Currency"]
         self.verify_import_export_types(data, default_type, pass_types, fail_types)
@@ -307,6 +332,14 @@ class SbdfTest(unittest.TestCase):
         default_type = "TimeSpan"
         pass_types = ["String", "TimeSpan", "Boolean"]
         fail_types = ["Binary", "Currency", "DateTime", "Date", "Time", "Integer", "LongInteger", "SingleReal", "Real"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
+    def test_import_export_currency(self):
+        """Verify currency/decimal column conversions"""
+        data = [decimal.Decimal("123.45"), decimal.Decimal("67.890")]
+        default_type = "Currency"
+        pass_types = ["String", "Currency", "Boolean"]
+        fail_types = ["Binary", "DateTime", "Date", "Time", "TimeSpan", "Integer", "LongInteger", "SingleReal", "Real"]
         self.verify_import_export_types(data, default_type, pass_types, fail_types)
 
     def test_import_export_missing(self):
