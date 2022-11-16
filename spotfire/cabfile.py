@@ -7,6 +7,7 @@
 import sys
 
 if sys.platform == "win32":
+    # pylint: disable=deprecated-module
     import msilib
     import os
     import typing
