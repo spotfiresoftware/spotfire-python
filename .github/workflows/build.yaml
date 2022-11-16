@@ -27,10 +27,9 @@ jobs:
       - name: Determine Test Environments
         id: find-test-envs
         run: |
-          echo -n "::set-output name=test-envs::[" > envs.txt
-          ls test_requirements_* | sed -e 's/test_requirements_/"/' -e 's/.txt/"/' | tr '\n' ',' | sed -e 's/,$//' >> envs.txt
-          echo "]" >> envs.txt
-          cat envs.txt
+          echo -n "test-envs=[" >> $GITHUB_OUTPUT
+          ls test_requirements_* | sed -e 's/test_requirements_/"/' -e 's/.txt/"/' | tr '\n' ',' | sed -e 's/,$//' >> $GITHUB_OUTPUT
+          echo "]" >> $GITHUB_OUTPUT
     outputs:
       test-environments: ${{ steps.find-test-envs.outputs.test-envs }}
   test:
