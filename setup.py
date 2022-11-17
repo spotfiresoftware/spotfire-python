@@ -20,7 +20,15 @@ def get_requires(filename):
     return requirements
 
 
-class BuildExtDebug(build_ext):
+class BuildExt(build_ext):
+    def finalize_options(self):
+        super().finalize_options()
+        if self.build_temp:
+            for m in self.distribution.ext_modules:
+                m.include_dirs.extend([f"{self.build_temp}/pyrex/spotfire"])
+
+
+class BuildExtDebug(BuildExt):
     def finalize_options(self):
         if sys.platform == "win32":
             log.info("appending debug flags for Windows")
@@ -73,7 +81,7 @@ extensions = [
                        "vendor/sbdf-c/src/valuetype.c",
                        ],
               define_macros=[("SBDF_STATIC", None)],
-              include_dirs=["vendor/sbdf-c/include", np.get_include()],
+              include_dirs=["spotfire", "vendor/sbdf-c/include", np.get_include()],
               cython_c_in_temp=True
               ),
 ]
@@ -91,7 +99,7 @@ setup(
     license='BSD 3-Clause License',
     packages=find_packages(exclude=['spotfire.test']),
     ext_modules=extensions,
-    cmdclass={'build_ext': build_ext, 'build_ext_debug': BuildExtDebug},
+    cmdclass={'build_ext': BuildExt, 'build_ext_debug': BuildExtDebug},
     include_package_data=True,
     install_requires=project_requirements,
     python_requires='>=3.7',
