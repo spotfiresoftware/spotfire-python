@@ -1,6 +1,6 @@
 # cython: language_level=3
 
-# Copyright © 2022. TIBCO Software Inc.
+# Copyright © 2022. Cloud Software Group, Inc.
 # This file is subject to the license terms contained
 # in the license file that is distributed with this file.
 
