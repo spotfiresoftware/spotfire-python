@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.release.prerelease }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Set Up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
       - name: Install Tools
@@ -26,16 +26,15 @@ jobs:
       - name: Build Source Dist
         run: |
           python setup.py sdist
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: sdist
           path: 'dist/**'
       - name: Dynamic Elements
         id: dynamic
         run: |
-          echo -n "::set-output name=pythons::" > dynamic.txt
-          cat .github/python-versions.json >> dynamic.txt
-          cat dynamic.txt
+          echo -n "pythons::" >> $GITHUB_OUTPUTS
+          cat .github/python-versions.json >> $GITHUB_OUTPUTS
     outputs:
       python-versions: ${{ steps.dynamic.outputs.pythons }}
   build-wheel:
@@ -48,11 +47,11 @@ jobs:
         operating-system: [ 'ubuntu-latest', 'windows-latest' ]
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Set Up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Build Requirements
@@ -68,7 +67,7 @@ jobs:
         run: |
           mv dist/*.whl .
           auditwheel repair -w dist ./*.whl
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
           path: 'dist/**'
@@ -77,11 +76,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-wheel
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           path: dist
       - name: Set Up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.x'
       - name: Install Tools
