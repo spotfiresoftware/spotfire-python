@@ -1,4 +1,4 @@
-# Copyright © 2021. TIBCO Software Inc.
+# Copyright © 2021. Cloud Software Group, Inc.
 # This file is subject to the license terms contained
 # in the license file that is distributed with this file.
 
@@ -92,7 +92,7 @@ setup(
     description='Package for Building Python Extensions to TIBCO Spotfire',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    author='TIBCO Software Inc.',
+    author='Cloud Software Group, Inc.',
     maintainer='Spotfire Python Package Support',
     maintainer_email='spotfirepython@tibco.com',
     url='https://github.com/TIBCOSoftware/spotfire-python',
