@@ -50,12 +50,21 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 if sys.platform == "win32":
+    cabfile_libraries = ['cabinet']
     codesign_includes = ['vendor/windows']
     codesign_libraries = ['crypt32']
 else:
+    cabfile_libraries = []
     codesign_includes = []
     codesign_libraries = []
 extensions = [
+    Extension("spotfire.cabfile",
+              sources=["spotfire/cabfile.pyx",
+                       "spotfire/cabfile_helpers.c",
+                       ],
+              libraries=cabfile_libraries,
+              cython_c_in_temp=True
+              ),
     Extension("spotfire.codesign",
               sources=["spotfire/codesign.pyx"],
               include_dirs=codesign_includes,

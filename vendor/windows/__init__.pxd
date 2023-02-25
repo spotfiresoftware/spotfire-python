@@ -5,6 +5,7 @@ cdef extern from "<windows.h>" nogil:
     ctypedef unsigned long DWORD
     ctypedef void* HANDLE
     ctypedef int HRESULT
+    ctypedef Py_ssize_t INT_PTR
 
     # Preprocessor definitions defined at https://docs.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
     cdef enum:
