@@ -143,6 +143,7 @@ cdef _SbdfDecimal _decimal_to_bytes(dec: decimal.Decimal) except *:
     cdef _SbdfDecimal out
     cdef int i
     dec_tuple = dec.as_tuple()
+    string.memset(&out, 0, sizeof(_SbdfDecimal))
 
     ## Coefficient
     coefficient = 0
@@ -945,7 +946,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
     ## Geometry
     column_names.append("Geometry")
-    column_metadata.append({"MapChart.ColumnTypeId": "Geometry", "ContentType": "application/x-wkb"})
+    column_metadata.append({"MapChart.ColumnTypeId": ["Geometry"], "ContentType": ["application/x-wkb"]})
     context = _ExportContext()
     context.set_valuetype_id(sbdf_c.SBDF_BINARYTYPEID)
     values = np_c.PyArray_ZEROS(1, shape, np_c.NPY_OBJECT, 0)
@@ -956,7 +957,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
     ## XMin
     column_names.append("XMin")
-    column_metadata.append({"MapChart.ColumnTypeId": "XMin"})
+    column_metadata.append({"MapChart.ColumnTypeId": ["XMin"]})
     context = _ExportContext()
     context.set_valuetype_id(sbdf_c.SBDF_DOUBLETYPEID)
     context.set_arrays(geometry_bounds["minx"].to_numpy(), invalids)
@@ -964,7 +965,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
     ## XMax
     column_names.append("XMax")
-    column_metadata.append({"MapChart.ColumnTypeId": "XMax"})
+    column_metadata.append({"MapChart.ColumnTypeId": ["XMax"]})
     context = _ExportContext()
     context.set_valuetype_id(sbdf_c.SBDF_DOUBLETYPEID)
     context.set_arrays(geometry_bounds["maxx"].to_numpy(), invalids)
@@ -972,7 +973,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
     ## YMin
     column_names.append("YMin")
-    column_metadata.append({"MapChart.ColumnTypeId": "YMin"})
+    column_metadata.append({"MapChart.ColumnTypeId": ["YMin"]})
     context = _ExportContext()
     context.set_valuetype_id(sbdf_c.SBDF_DOUBLETYPEID)
     context.set_arrays(geometry_bounds["miny"].to_numpy(), invalids)
@@ -980,7 +981,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
     ## YMax
     column_names.append("YMax")
-    column_metadata.append({"MapChart.ColumnTypeId": "YMax"})
+    column_metadata.append({"MapChart.ColumnTypeId": ["YMax"]})
     context = _ExportContext()
     context.set_valuetype_id(sbdf_c.SBDF_DOUBLETYPEID)
     context.set_arrays(geometry_bounds["maxy"].to_numpy(), invalids)
@@ -988,7 +989,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
     ## XCenter
     column_names.append("XCenter")
-    column_metadata.append({"MapChart.ColumnTypeId": "XCenter"})
+    column_metadata.append({"MapChart.ColumnTypeId": ["XCenter"]})
     context = _ExportContext()
     context.set_valuetype_id(sbdf_c.SBDF_DOUBLETYPEID)
     values = np_c.PyArray_ZEROS(1, shape, np_c.NPY_FLOAT64, 0)
@@ -999,7 +1000,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
     ## YCenter
     column_names.append("YCenter")
-    column_metadata.append({"MapChart.ColumnTypeId": "YCenter"})
+    column_metadata.append({"MapChart.ColumnTypeId": ["YCenter"]})
     context = _ExportContext()
     context.set_valuetype_id(sbdf_c.SBDF_DOUBLETYPEID)
     values = np_c.PyArray_ZEROS(1, shape, np_c.NPY_FLOAT64, 0)
@@ -1017,25 +1018,25 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
         raise SBDFError("cannot convert mixed geometry types")
     geom_type = geometry[0].geom_type
     if geom_type == "Point":
-        table_metadata["MapChart.GeometryType"] = "Point"
+        table_metadata["MapChart.GeometryType"] = ["Point"]
     elif geom_type == "LineString" or geom_type == "LinearRing":
-        table_metadata["MapChart.GeometryType"] = "Line"
+        table_metadata["MapChart.GeometryType"] = ["Line"]
     elif geom_type == "MultiLineString":
-        table_metadata["MapChart.GeometryType"] = "PolyLine"
+        table_metadata["MapChart.GeometryType"] = ["PolyLine"]
     elif geom_type == "Polygon":
-        table_metadata["MapChart.GeometryType"] = "Polygon"
+        table_metadata["MapChart.GeometryType"] = ["Polygon"]
     else:
         raise SBDFError("cannot convert collections of Shapely objects")
     # CRS
     if geometry_crs is not None:
         try:
-            table_metadata["MapChart.GeographicCrs"] = geometry_crs.to_string()
+            table_metadata["MapChart.GeographicCrs"] = [geometry_crs.to_string()]
         except AttributeError:
             # GeoPandas <= 0.6.3
             if geometry_crs.startsWith("+init="):
-                table_metadata["MapChart.GeographicCrs"] = geometry_crs[6:]
+                table_metadata["MapChart.GeographicCrs"] = [geometry_crs[6:]]
             else:
-                table_metadata["MapChart.GeographicCrs"] = geometry_crs
+                table_metadata["MapChart.GeographicCrs"] = [geometry_crs]
 
 
 cdef _export_obj_series(obj, default_column_name):
@@ -1438,6 +1439,7 @@ cdef int _export_vt_decimal(_ExportContext context, Py_ssize_t start, Py_ssize_t
     cdef int i
     cdef _SbdfDecimal dec
     try:
+        string.memset(buf, 0, count * sizeof(_SbdfDecimal))
         for i in range(count):
             if not context.invalid_array[start + i]:
                 val_i = context.values_array[start + i]
@@ -1711,7 +1713,11 @@ cdef sbdf_c.sbdf_metadata_head* _export_metadata(dict md, int column_num) except
 
     for (name_str, val) in md.items():
         name = name_str.encode("utf-8")
+        if not isinstance(val, list):
+            val = [val]
         val_len = <int>len(val)
+        if val_len > 1:
+            raise SBDFError(f"{metadata_description} metadata '{name_str}' is not length 1")
         val_type.id = _export_infer_valuetype_from_type(val, f"{metadata_description} metadata '{name_str}'")
 
         if val_type.id == sbdf_c.SBDF_STRINGTYPEID:
