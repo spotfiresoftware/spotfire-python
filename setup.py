@@ -97,7 +97,7 @@ setup(
     maintainer_email='spotfirepython@tibco.com',
     url='https://github.com/TIBCOSoftware/spotfire-python',
     license='BSD 3-Clause License',
-    packages=find_packages(exclude=['spotfire.test']),
+    packages=find_packages(exclude=['spotfire.test.files']),
     ext_modules=extensions,
     cmdclass={'build_ext': BuildExt, 'build_ext_debug': BuildExtDebug},
     include_package_data=True,
