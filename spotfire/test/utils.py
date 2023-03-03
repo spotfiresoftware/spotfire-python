@@ -50,7 +50,7 @@ def get_test_data_file(name):
     :param name: the basename of the test file
     :return: the full filename of the test file
     """
-    test_dir, test_file = os.path.split(inspect.stack()[1].filename)
+    test_dir, _ = os.path.split(inspect.stack()[1].filename)
     if "TEST_FILES_DIR" in os.environ:
         files_dir = os.getenv("TEST_FILES_DIR")
     else:
