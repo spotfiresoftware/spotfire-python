@@ -27,7 +27,9 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: test-files
-          path: 'spotfire/test/files/**'
+          path: |
+            spotfire/test/files/**
+            test_requirements_*.txt
       - name: Dynamic Elements
         id: dynamic
         run: |
@@ -119,7 +121,8 @@ jobs:
       - name: Process Python Version
         id: version
         run: |
-          echo "python-version=${{ fromJson(needs.build-sdist.outputs.python-versions)[0] }}" >> $GITHUB_OUTPUT
+          echo -n "python-version="  >> $GITHUB_OUTPUT
+          echo ${{ needs.build-sdist.outputs.python-versions }} | sed -e 's/[^"]*"//' -e 's/".*//' >> $GITHUB_OUTPUT
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
