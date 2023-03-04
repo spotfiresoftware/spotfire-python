@@ -64,11 +64,11 @@ jobs:
       - name: Build Wheel
         run: |
           python setup.py bdist_wheel
-      - name: Convert Wheel to Manylinux
-        if: ${{ matrix.operating-system == 'ubuntu-latest' }}
-        run: |
-          mv dist/*.whl .
-          auditwheel repair -w dist ./*.whl
+#      - name: Convert Wheel to Manylinux
+#        if: ${{ matrix.operating-system == 'ubuntu-latest' }}
+#        run: |
+#          mv dist/*.whl .
+#          auditwheel repair -w dist ./*.whl
       - uses: actions/upload-artifact@v3
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
