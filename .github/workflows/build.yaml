@@ -29,6 +29,7 @@ jobs:
           name: test-files
           path: |
             spotfire/test/files/**
+            spotfire/requirements.txt
             test_requirements_*.txt
       - name: Dynamic Elements
         id: dynamic
@@ -122,7 +123,7 @@ jobs:
         id: version
         run: |
           echo -n "python-version="  >> $GITHUB_OUTPUT
-          echo ${{ needs.build-sdist.outputs.python-versions }} | sed -e 's/[^"]*"//' -e 's/".*//' >> $GITHUB_OUTPUT
+          echo '${{ needs.build-sdist.outputs.python-versions }}' | sed -e 's/[^"]*"//' -e 's/".*//' >> $GITHUB_OUTPUT
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
