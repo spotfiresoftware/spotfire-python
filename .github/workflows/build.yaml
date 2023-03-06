@@ -27,10 +27,15 @@ jobs:
         with:
           name: test-files
           path: |
-            requirements_lint.txt
             spotfire/test/files/**
             spotfire/requirements.txt
             test_requirements_*.txt
+      - uses: actions/upload-artifact@v3
+        with:
+          name: analysis-files
+          path: |
+            pylintrc
+            requirements_lint.txt
       - name: Dynamic Elements
         id: dynamic
         run: |
@@ -137,11 +142,10 @@ jobs:
           path: dist
       - uses: actions/download-artifact@v3
         with:
-          name: test-files
-          path: test-files
+          name: analysis-files
       - name: Install Tools
         run: |
-          pip install dist/*.whl -r test-files/requirements_lint.txt
+          pip install dist/*.whl -r requirements_lint.txt
       - name: Static Analysis with pylint
         run: |
           pylint spotfire
