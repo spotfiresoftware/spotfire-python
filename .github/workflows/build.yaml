@@ -101,13 +101,13 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install dist/*.whl -r test_requirements_${{ matrix.test-environment }}.txt
+          pip install dist/*.whl -r test-files/test_requirements_${{ matrix.test-environment }}.txt
       - name: Run Tests
         run: |
           python -m spotfire.test
         env:
           RESULTS_NAME: ${{ matrix.python-version }}-${{ matrix.operating-system }}-${{ matrix.test-environment }}
-          TEST_FILES_DIR: ${{ github.workspace }}/test-files
+          TEST_FILES_DIR: ${{ github.workspace }}/test-files/spotfire/test/files
       - uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
@@ -115,7 +115,7 @@ jobs:
           path: 'results-*.xml'
   lint:
     name: Static Analysis
-    needs: build-wheel
+    needs: [build-sdist, build-wheel]
     runs-on: ubuntu-latest
     steps:
       - name: Process Python Version
