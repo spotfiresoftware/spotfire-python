@@ -7,6 +7,7 @@ import tempfile
 import pkg_resources
 
 import pandas
+import pandas.testing
 import geopandas
 
 import spotfire
@@ -155,7 +156,7 @@ class SbdfTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(dataframe, f"{tempdir}/test.sbdf")
             df2 = sbdf.import_data(f"{tempdir}/test.sbdf")
-            self.assertTrue(dataframe.equals(df2))
+            pandas.testing.assert_frame_equal(dataframe, df2)
 
     def test_write_nullable_dtypes(self):
         """We should be able to write all nullable column dtypes."""
@@ -242,8 +243,8 @@ class SbdfTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
             new_df = sbdf.import_data(f"{tempdir}/output.sbdf")
-        self.assertTrue(dataframe.equals(new_df))
-        self.assertTrue(spotfire.get_spotfire_types(dataframe).equals(spotfire.get_spotfire_types(new_df)))
+        pandas.testing.assert_frame_equal(dataframe, new_df)
+        pandas.testing.assert_series_equal(spotfire.get_spotfire_types(dataframe), spotfire.get_spotfire_types(new_df))
 
     def test_invalid_export_type(self):
         """Verify invalid export types are ignored"""
