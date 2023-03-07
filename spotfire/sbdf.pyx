@@ -1358,6 +1358,8 @@ cdef int _export_vt_datetime(_ExportContext context, Py_ssize_t start, Py_ssize_
             val_i = context.values_array[start + i]
             if isinstance(val_i, pd.Timestamp):
                 dt = val_i.to_pydatetime()
+            elif isinstance(val_i, np.datetime64):
+                dt = np.datetime64(val_i, "ms").astype(datetime.datetime)
             elif isinstance(val_i, datetime.datetime):
                 dt = val_i
             else:
@@ -1413,6 +1415,8 @@ cdef int _export_vt_timespan(_ExportContext context, Py_ssize_t start, Py_ssize_
             val_i = context.values_array[start + i]
             if isinstance(val_i, pd.Timedelta):
                 td = val_i.to_pytimedelta()
+            elif isinstance(val_i, np.timedelta64):
+                td = np.timedelta64(val_i, "ms").astype(datetime.timedelta)
             elif isinstance(val_i, datetime.timedelta):
                 td = val_i
             else:
