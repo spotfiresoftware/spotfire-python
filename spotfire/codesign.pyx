@@ -14,6 +14,17 @@ IF UNAME_SYSNAME == "Windows":
     from vendor cimport windows
     from vendor.windows cimport wincrypt, mssign32
 
+    cdef class CodesignError(Exception):
+        """An exception that is raised to indicate a problem during code signing."""
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.winerror = windows.GetLastError()
+
+        cdef windows.DWORD winerror
+
+        def __str__(self):
+            return f"[WinError {self.winerror:08x}] {super().__str__()}"
+
     # An empty string.  Sometimes no passwords are encoded this way, sometimes as NULL.
     cdef Py_UNICODE _empty_wstring[1]
     _empty_wstring[:] = [0]
@@ -23,7 +34,7 @@ IF UNAME_SYSNAME == "Windows":
                              windows.LPCWSTR password,
                              windows.LPCWSTR timestamp = NULL,
                              bint use_rfc3161 = False,
-                             bint use_sha256 = False):
+                             bint use_sha256 = False) except *:
         """Codesign a file using the Microsoft signing API found in mssign32.dll.
     
         :param filename: the filename of the file to codesign
@@ -60,24 +71,24 @@ IF UNAME_SYSNAME == "Windows":
             if not os.path.isfile(certificate):
                 raise FileNotFoundError(f"No such file: '{certificate}'")
             if use_sha256 and not use_rfc3161:
-                raise Exception("SHA-256 timestamping requires the RFC 3161 timestamping protocol")
+                raise ValueError("SHA-256 timestamping requires the RFC 3161 timestamping protocol")
 
             # Load DLL and functions from mssign32.dll
             mssign32_library = windows.LoadLibrary("mssign32.dll")
             if mssign32_library is NULL:
-                raise Exception(f"Cannot load mssign32.dll (0x{windows.GetLastError():08x})")
+                raise CodesignError("Cannot load mssign32.dll")
             signer_sign_ex_fun = <mssign32.SignerSignExType>windows.GetProcAddress(mssign32_library, "SignerSignEx")
             if signer_sign_ex_fun is NULL:
-                raise Exception(f"Cannot find function 'SignerSignEx' (0x{windows.GetLastError():08x})")
+                raise CodesignError("Cannot find function 'SignerSignEx'")
             signer_time_stamp_fun = <mssign32.SignerTimeStampType>windows.GetProcAddress(mssign32_library, "SignerTimeStamp")
             if signer_time_stamp_fun is NULL:
-                raise Exception(f"Cannot find function 'SignerTimeStamp' (0x{windows.GetLastError():08x})")
+                raise CodesignError("Cannot find function 'SignerTimeStamp'")
             signer_time_stamp_ex2_fun = <mssign32.SignerTimeStampEx2Type>windows.GetProcAddress(mssign32_library, "SignerTimeStampEx2")
             if signer_time_stamp_ex2_fun is NULL:
-                raise Exception(f"Cannot find function 'SignerTimeStampEx2' (0x{windows.GetLastError():08x})")
+                raise CodesignError("Cannot find function 'SignerTimeStampEx2'")
             signer_free_signer_context_fun = <mssign32.SignerFreeSignerContextType>windows.GetProcAddress(mssign32_library, "SignerFreeSignerContext")
             if signer_free_signer_context_fun is NULL:
-                raise Exception(f"Cannot find function 'SignerFreeSignerContext' (0x{windows.GetLastError():08x})")
+                raise CodesignError("Cannot find function 'SignerFreeSignerContext'")
 
             # Open the certificate file and convert it into an in-memory cert store
             with open(certificate, "rb") as cert:
@@ -90,14 +101,14 @@ IF UNAME_SYSNAME == "Windows":
             if cert_store is NULL:
                 cert_store = wincrypt.PFXImportCertStore(&cert_blob, NULL, 0)
             if cert_store is NULL:
-                raise Exception(f"Could not load certificate; is the password correct? (0x{windows.GetLastError():08x})")
+                raise CodesignError(f"Could not load certificate {certificate}; is the password correct?")
 
             # Extract the cert from the new cert store
             cert_context = wincrypt.CertFindCertificateInStore(cert_store,
                                                                wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
                                                                0, wincrypt.CERT_FIND_ANY, NULL, NULL)
             if cert_context is NULL:
-                raise Exception(f"Could not get certificate from store (0x{windows.GetLastError():08x})")
+                raise CodesignError("Could not get certificate from store")
             found_private_key = False
             while not found_private_key:
                 key_spec_len = sizeof(key_spec)
@@ -111,7 +122,7 @@ IF UNAME_SYSNAME == "Windows":
                                                                        wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
                                                                        0, wincrypt.CERT_FIND_ANY, NULL, cert_context)
                     if cert_context is NULL:
-                        raise Exception(f"Could not get certificate from store (0x{windows.GetLastError():08x})")
+                        raise CodesignError("Could not get certificate from store")
 
             # Prepare structures
             signer_file_info.cbSize = sizeof(mssign32.SIGNER_FILE_INFO)
@@ -119,6 +130,7 @@ IF UNAME_SYSNAME == "Windows":
             signer_file_info.hFile = NULL
 
             signer_subject_info.cbSize = sizeof(mssign32.SIGNER_SUBJECT_INFO)
+            index = 0
             signer_subject_info.pdwIndex = &index
             signer_subject_info.dwSubjectChoice = mssign32.SIGNER_SUBJECT_FILE
             signer_subject_info.pSignerFileInfo = &signer_file_info
@@ -152,7 +164,7 @@ IF UNAME_SYSNAME == "Windows":
             if signer_context is not NULL:
                 signer_free_signer_context_fun(signer_context)
             if result is not windows.S_OK:
-                raise Exception(f"Could not sign file (0x{windows.GetLastError():08x})")
+                raise CodesignError(f"Could not sign file {filename}")
 
             # Timestamp the file
             if timestamp is not NULL:
@@ -166,7 +178,7 @@ IF UNAME_SYSNAME == "Windows":
                 else:
                     result = signer_time_stamp_fun(&signer_subject_info, timestamp, NULL, NULL)
                 if result is not windows.S_OK:
-                    raise Exception(f"Could not timestamp file (0x{windows.GetLastError():08x})")
+                    raise CodesignError(f"Could not timestamp file {filename}")
         finally:
             if cert_context is not NULL:
                 wincrypt.CertFreeCertificateContext(cert_context)
