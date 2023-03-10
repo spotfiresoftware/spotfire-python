@@ -62,6 +62,7 @@ extensions = [
               sources=["spotfire/cabfile.pyx",
                        "spotfire/cabfile_helpers.c",
                        ],
+              include_dirs=["spotfire"],
               libraries=cabfile_libraries,
               cython_c_in_temp=True
               ),

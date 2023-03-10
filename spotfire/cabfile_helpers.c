@@ -4,6 +4,8 @@
 
 #include <Python.h>
 
+#ifdef _WIN32
+
 #include <windows.h>
 #include <fcntl.h>
 #include <fci.h>
@@ -144,3 +146,7 @@ FNFCIGETOPENINFO(_fci_cb_get_open_info) {
     PyMem_Free(wide);
     return result;
 }
+
+#else  /* _WIN32 */
+#endif /* _WIN32 */
+
