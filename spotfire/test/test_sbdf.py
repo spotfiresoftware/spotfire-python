@@ -2,16 +2,17 @@
 
 import datetime
 import decimal
-import os
 import unittest
 import tempfile
 import pkg_resources
 
 import pandas
+import pandas.testing
 import geopandas
 
 import spotfire
 from spotfire import sbdf
+from spotfire.test import utils
 
 
 class SbdfTest(unittest.TestCase):
@@ -20,7 +21,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_0(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/0.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/0.sbdf"))
         self.assertEqual(dataframe.shape, (0, 12))
 
         def verify(dict_, pre, post):
@@ -56,7 +57,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_1(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/1.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/1.sbdf"))
         self.assertEqual(dataframe.shape, (1, 12))
         self.assertEqual(dataframe.at[0, "Boolean"], False)
         self.assertEqual(dataframe.at[0, "Integer"], 69)
@@ -72,7 +73,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_100(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/100.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/100.sbdf"))
         self.assertEqual(dataframe.shape, (100, 12))
         self.assertEqual(dataframe.get("Boolean")[0:6].tolist(), [False, True, None, False, True, None])
         self.assertEqual(dataframe.get("Integer")[0:6].dropna().tolist(), [69.0, 73.0, 75.0, 79.0])
@@ -90,7 +91,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_10001(self):
         """Reading simple SBDF files should work."""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/10001.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/10001.sbdf"))
         self.assertEqual(dataframe.shape, (10001, 12))
         # Check the values in the first row
         self.assertEqual(dataframe.at[0, "Boolean"], False)
@@ -119,7 +120,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_write_geodata(self):
         """Test that geo-encoded data is properly converted to/from GeoDataFrame"""
-        gdf = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/NACountries.sbdf")
+        gdf = sbdf.import_data(utils.get_test_data_file("sbdf/NACountries.sbdf"))
         self.assertIsInstance(gdf, pandas.DataFrame)
         self.assertIsInstance(gdf, geopandas.GeoDataFrame)
 
@@ -142,7 +143,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_write_unicode(self):
         """Test that unicode string arrays are properly written"""
-        udf = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/unicode.sbdf")
+        udf = sbdf.import_data(utils.get_test_data_file("sbdf/unicode.sbdf"))
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(udf, f"{tempdir}/test.sbdf")
             udf2 = sbdf.import_data(f"{tempdir}/test.sbdf")
@@ -151,11 +152,11 @@ class SbdfTest(unittest.TestCase):
 
     def test_read_write_alltypes(self):
         """Test that all data types can be properly roundtripped read/write"""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/alltypes.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/alltypes.sbdf"))
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(dataframe, f"{tempdir}/test.sbdf")
             df2 = sbdf.import_data(f"{tempdir}/test.sbdf")
-            self.assertTrue(dataframe.equals(df2))
+            pandas.testing.assert_frame_equal(dataframe, df2)
 
     def test_write_nullable_dtypes(self):
         """We should be able to write all nullable column dtypes."""
@@ -177,7 +178,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_get_spotfire_types(self):
         """All types should be reported properly"""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/alltypes.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/alltypes.sbdf"))
         type_names = spotfire.get_spotfire_types(dataframe)
         self.assertEqual(type_names["ColumnBoolean"], "Boolean")
         self.assertEqual(type_names["ColumnDate"], "Date")
@@ -194,7 +195,7 @@ class SbdfTest(unittest.TestCase):
 
     def test_set_spotfire_types(self):
         """Setting SBDF types should work properly"""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/alltypes.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/alltypes.sbdf"))
         # set a single column by name
         spotfire.set_spotfire_types(dataframe, {"ColumnLong": "Integer"})
         self.assertEqual(spotfire.get_spotfire_types(dataframe)["ColumnLong"], "Integer")
@@ -238,12 +239,12 @@ class SbdfTest(unittest.TestCase):
 
     def test_import_export_alltypes(self):
         """Verify all types properly export and re-import with the proper Spotfire type"""
-        dataframe = sbdf.import_data(f"{os.path.dirname(__file__)}/files/sbdf/alltypes.sbdf")
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/alltypes.sbdf"))
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
             new_df = sbdf.import_data(f"{tempdir}/output.sbdf")
-        self.assertTrue(dataframe.equals(new_df))
-        self.assertTrue(spotfire.get_spotfire_types(dataframe).equals(spotfire.get_spotfire_types(new_df)))
+        pandas.testing.assert_frame_equal(dataframe, new_df)
+        pandas.testing.assert_series_equal(spotfire.get_spotfire_types(dataframe), spotfire.get_spotfire_types(new_df))
 
     def test_invalid_export_type(self):
         """Verify invalid export types are ignored"""
@@ -267,10 +268,35 @@ class SbdfTest(unittest.TestCase):
                       "Integer", "LongInteger", "SingleReal", "Real", "Binary"]
         self.verify_import_export_types(data, default_type, pass_types, fail_types)
 
+    def test_import_export_binary(self):
+        """Verify binary column conversions"""
+        data = [b"apple", b"banana", b"cherry"]
+        default_type = "Binary"
+        pass_types = ["String", "Binary", "Boolean"]
+        fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Currency",
+                      "Integer", "LongInteger", "SingleReal", "Real"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
+    def test_import_export_boolean(self):
+        """Verify boolean column conversions"""
+        data = [True, False]
+        default_type = "Boolean"
+        pass_types = ["String", "Boolean", "Integer", "LongInteger", "SingleReal", "Real"]
+        fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Binary", "Currency"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
     def test_import_export_integer(self):
         """Verify integer column conversions"""
         data = [1, 2, 3]
         default_type = "LongInteger"
+        pass_types = ["String", "Boolean", "Integer", "LongInteger", "SingleReal", "Real"]
+        fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Binary", "Currency"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
+    def test_import_export_float(self):
+        """Verify float column conversions"""
+        data = [1., 2., 3.5]
+        default_type = "Real"
         pass_types = ["String", "Boolean", "Integer", "LongInteger", "SingleReal", "Real"]
         fail_types = ["DateTime", "Date", "Time", "TimeSpan", "Binary", "Currency"]
         self.verify_import_export_types(data, default_type, pass_types, fail_types)
@@ -309,6 +335,14 @@ class SbdfTest(unittest.TestCase):
         fail_types = ["Binary", "Currency", "DateTime", "Date", "Time", "Integer", "LongInteger", "SingleReal", "Real"]
         self.verify_import_export_types(data, default_type, pass_types, fail_types)
 
+    def test_import_export_currency(self):
+        """Verify currency/decimal column conversions"""
+        data = [decimal.Decimal("123.45"), decimal.Decimal("67.890")]
+        default_type = "Currency"
+        pass_types = ["String", "Currency", "Boolean"]
+        fail_types = ["Binary", "DateTime", "Date", "Time", "TimeSpan", "Integer", "LongInteger", "SingleReal", "Real"]
+        self.verify_import_export_types(data, default_type, pass_types, fail_types)
+
     def test_import_export_missing(self):
         """Verify column with all missing values can be coerced to anything"""
         data = [None, None, None]
@@ -331,8 +365,9 @@ class SbdfTest(unittest.TestCase):
             self.assertEqual(new_df_types["x"], default_type)
         # if default is None expect failure
         else:
-            with self.assertRaises(sbdf.SBDFError):
-                sbdf.export_data(dataframe, "output.sbdf")
+            with tempfile.TemporaryDirectory() as tempdir:
+                with self.assertRaises(sbdf.SBDFError):
+                    sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
 
         # validate expected passing cases
         for df_type in pass_types:

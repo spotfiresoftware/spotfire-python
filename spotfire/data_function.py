@@ -213,7 +213,7 @@ class AnalyticSpec:
         self.outputs = outputs if isinstance(outputs, list) else []
         self.script = script
         self.debug_enabled = False
-        self.globals = dict(__builtins__=__builtins__)
+        self.globals = {'__builtins__': __builtins__}
         self.log = io.StringIO()
         self.compiled_script = None
 

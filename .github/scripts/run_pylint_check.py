@@ -1,3 +1,5 @@
+# pylint: skip-file
+
 import argparse
 import io
 import os
