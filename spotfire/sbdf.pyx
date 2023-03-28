@@ -1890,7 +1890,7 @@ def export_data(obj, sbdf_file, default_column_name="x", Py_ssize_t rows_per_sli
             else:
                 if row_count != len(exporter_contexts[i]):
                     raise SBDFError(f"column '{column_names[i]}' has inconsistent column length")
-            col = column_names[i].encode('utf-8')
+            col = str(column_names[i]).encode('utf-8')
             col_md = _export_metadata(column_metadata[i], i)
             col_vt.id = exporter_contexts[i].get_valuetype_id()
             error = sbdf_c.sbdf_cm_set_values(col, col_vt, col_md)
