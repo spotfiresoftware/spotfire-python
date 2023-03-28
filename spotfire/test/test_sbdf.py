@@ -411,5 +411,5 @@ class SbdfTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
             df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
-            for i in range(len(df2.columns)):
-                self.assertEqual(type(df2.columns[i]), str)
+            for i, col in enumerate(df2.columns):
+                self.assertEqual(type(col), str, f"df2.columns[{i}] = {repr(col)}")
