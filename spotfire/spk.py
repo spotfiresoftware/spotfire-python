@@ -613,6 +613,7 @@ class _CabPackageBuilder(_PackageBuilder):
         from spotfire import cabfile, codesign
         metadata_files = metadata.find("Files")
 
+        # pylint: disable=not-context-manager
         with cabfile.CabFile(payload_dest) as payload:
             # Add all files that are supposed to go into the package
             for filename_ondisk, filename_payload in self._contents:
