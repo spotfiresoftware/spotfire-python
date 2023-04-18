@@ -100,8 +100,7 @@ class _SpkVersion:
         return version
 
     def __str__(self):
-        # pylint: disable=consider-using-f-string
-        return "%d.%d.%d.%d" % tuple(self._versions)
+        return '.'.join([str(x) for x in self._versions])
 
     def __repr__(self):
         return f"{self.__class__.__module__}.{self.__class__.__qualname__}{tuple(self._versions)!r}"
@@ -209,7 +208,7 @@ def _read_brand(filename: str, comment: str) -> typing.Dict:
 
 
 class _PackageBuilder(metaclass=abc.ABCMeta):
-    # pylint: disable=too-many-instance-attributes,consider-using-f-string
+    # pylint: disable=too-many-instance-attributes
     def __init__(self) -> None:
         self.name = None
         self.version = None
@@ -221,7 +220,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         if platform.system() == "Windows":
             self._site_packages_dirname = "Lib\\site-packages"
         else:
-            self._site_packages_dirname = "lib/python%d.%d/site-packages" % sys.version_info[:2]
+            self._site_packages_dirname = f"lib/python{'.'.join([str(x) for x in sys.version_info[:2]])}/site-packages"
 
     def add(self, filename: str, archive_name: str) -> None:
         """Add a file to the package."""
@@ -291,7 +290,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :return: a function that cleans up the temporarily installed packages, and a dict that maps the names of
         pip packages that were scanned into the SPK package to their installed versions
         """
-        # pylint: disable=too-many-locals,subprocess-run-check
+        # pylint: disable=too-many-locals
 
         tempdir = tempfile.mkdtemp(prefix="spk")
         self.last_scan_dir = tempdir
@@ -306,7 +305,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                    "--target", tempdir, "--requirement", requirements]
         if constraint:
             command.extend(["--constraint", constraint])
-        pip_install = subprocess.run(command)
+        pip_install = subprocess.run(command, check=False)
         if pip_install.returncode != 0:
             _error("Error installing required packages.  Aborting.")
             cleanup()
@@ -315,7 +314,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         # List packages that were installed.
         command = [sys.executable, "-m", "pip", "list", "--disable-pip-version-check", "--path", tempdir,
                    "--format", "json"]
-        pip_list = subprocess.run(command, capture_output=True)
+        pip_list = subprocess.run(command, capture_output=True, check=False)
         if pip_list.returncode != 0:
             _error("Error installing required packages.  Aborting.")
             cleanup()
@@ -347,7 +346,6 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         """ When building a custom Python Packages SPK, find and delete duplicate packages.
         :return:
         """
-        # Disable Pylint `Too many nested blocks`
         # pylint: disable=too-many-nested-blocks,too-many-locals
         # Use the spotfire requirements file as a deny list.
         if "spotfire.zip" in spotfire.__path__[0]:
@@ -488,15 +486,14 @@ def _et_to_bytes(element: ElementTree.Element) -> bytes:
 
 
 def _et_indent(element: ElementTree.Element, indent="  ", level=0) -> None:
-    # pylint: disable=redefined-argument-from-local
     indent_text = "\n" + (level * indent)
     if element:
         if not element.text or not element.text.strip():
             element.text = indent_text + indent
         if not element.tail or not element.tail.strip():
             element.tail = indent_text
-        for element in element:
-            _et_indent(element, indent, level + 1)
+        for elem in element:
+            _et_indent(elem, indent, level + 1)
         if not element.tail or not element.tail.strip():
             element.tail = indent_text
     else:
