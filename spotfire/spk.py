@@ -217,10 +217,19 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         self.excludes = []
         self.last_scan_dir = None
         self._contents = []
+        self._cleanup_dirs = []
+        self._cleanup_files = []
         if platform.system() == "Windows":
             self._site_packages_dirname = "Lib\\site-packages"
         else:
             self._site_packages_dirname = f"lib/python{'.'.join([str(x) for x in sys.version_info[:2]])}/site-packages"
+
+    def cleanup(self):
+        """Clean up temporary files used to create the package."""
+        for dirname in self._cleanup_dirs:
+            shutil.rmtree(dirname)
+        for filename in self._cleanup_files:
+            os.unlink(filename)
 
     def add(self, filename: str, archive_name: str) -> None:
         """Add a file to the package."""
@@ -258,7 +267,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             for filename in filenames:
                 filename_ondisk = os.path.join(root, filename)
                 filename_relative = os.path.relpath(filename_ondisk, spotfire.__path__[0])
-                filename_payload = f"{prefix}/{self._site_packages_dirname}/spotfire/{filename_relative}"
+                filename_payload = f"{prefix}/spotfire-packages/spotfire/{filename_relative}"
                 self.add(filename_ondisk, filename_payload)
 
         # Grab the .dist-info directory.
@@ -271,12 +280,11 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     for filename in filenames:
                         filename_ondisk = os.path.join(root, filename)
                         filename_relative = os.path.relpath(filename_ondisk, spotfire_dist_info_dir)
-                        filename_payload = f"{prefix}/{self._site_packages_dirname}/{subdir}/{filename_relative}"
+                        filename_payload = f"{prefix}/spotfire-packages/{subdir}/{filename_relative}"
                         self.add(filename_ondisk, filename_payload)
 
     def scan_requirements_txt(self, requirements: str, constraint: str, prefix: str, prefix_direct: bool = False,
-                              use_deny_list: bool = False) -> \
-            typing.Tuple[typing.Callable[[], None], typing.Dict[str, str]]:
+                              use_deny_list: bool = False) -> typing.Dict[str, str]:
         """Scan the contents of a pip 'requirements.txt' file into site-packages.
 
         :param requirements: the filename of the requirements file that declares the pip packages to put in the
@@ -284,20 +292,18 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :param constraint: the filename of the constraints file that declares the constraints pip should apply
         when resolving requirements
         :param prefix: the directory prefix under which the pip packages should be scanned into
-        :param prefix_direct: whether to scan the pip packages into the ``site-packages`` directory
+        :param prefix_direct: whether to scan the pip packages into the ``site-packages`` directory or directly
+                                into the prefix directory
         :param use_deny_list: whether to delete the packages included with the Interpreter from the
                                 temporary package area before bundling.
-        :return: a function that cleans up the temporarily installed packages, and a dict that maps the names of
-        pip packages that were scanned into the SPK package to their installed versions
+        :return: a dict that maps the names of pip packages that were scanned into the SPK package to their
+                   installed versions
         """
         # pylint: disable=too-many-locals
 
         tempdir = tempfile.mkdtemp(prefix="spk")
         self.last_scan_dir = tempdir
-
-        def cleanup():
-            """Cleanup the created tempdir."""
-            shutil.rmtree(tempdir)
+        self._cleanup_dirs.append(tempdir)
 
         # Install the packages from the requirement file into tempdir.
         _message(f"Installing pip packages from {requirements} to temporary location.")
@@ -308,7 +314,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         pip_install = subprocess.run(command, check=False)
         if pip_install.returncode != 0:
             _error("Error installing required packages.  Aborting.")
-            cleanup()
+            self.cleanup()
             sys.exit(1)
 
         # List packages that were installed.
@@ -317,7 +323,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         pip_list = subprocess.run(command, capture_output=True, check=False)
         if pip_list.returncode != 0:
             _error("Error installing required packages.  Aborting.")
-            cleanup()
+            self.cleanup()
             sys.exit(1)
         package_versions_json = json.loads(pip_list.stdout.decode(locale.getpreferredencoding()))
         package_versions = {x['name']: x['version'] for x in package_versions_json}
@@ -339,7 +345,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 if not filename_relative.startswith(f"bin{os.path.sep}"):
                     self.add(filename_ondisk, filename_payload)
 
-        return cleanup, package_versions
+        return package_versions
 
     @staticmethod
     def scan_duplicate_packages(tempdir: str, package_versions):
@@ -410,6 +416,20 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     _message(f"Unable to remove directory {package_directory_file}")
         _message("Completed removing files and directories for packages on the deny list.")
         return package_versions
+
+    def scan_path_configuration_file(self, prefix: str) -> None:
+        """Add a path configuration file for the 'spotfire-packages' directory to the Python interpreter.
+
+        :param prefix: the directory prefix under which the Python interpreter is located
+        """
+        _message("Adding path configuration file for spotfire-packages directory.")
+        fd, temp = tempfile.mkstemp()
+        with os.fdopen(fd, "w") as file:
+            file.write('import sys, os; '
+                       'sys.path.insert(min([i for i, x in enumerate(["site-packages" in x for x in sys.path]) if x]), '
+                       'f"{sys.prefix}{os.sep}spotfire-packages")\n')
+        self._cleanup_files.append(temp)
+        self.add(temp, f"{prefix}/spotfire.pth")
 
     @abc.abstractmethod
     def _payload_name(self) -> str:
@@ -692,27 +712,25 @@ def python(args, hook=None) -> None:
     package_builder.version = _SpkVersion.from_version_info(version_identifier)
 
     # Scan the files required to create the Python interpreter SPK
-    def cleanup():
-        """Dummy cleanup function."""
-
     if analyst:
         prefix = "python"
         package_builder.add_resource("default.python.interpreter.directory", prefix)
     else:
         prefix = "root/python"
     package_builder.scan_python_installation(prefix)
+    package_builder.scan_path_configuration_file(prefix)
     package_builder.scan_spotfire_package(prefix)
     spotfire_requirements = os.path.join(spotfire.__path__[0], "requirements.txt")
     try:
         constraints = getattr(args, "constraint")
-        cleanup, _ = package_builder.scan_requirements_txt(spotfire_requirements, constraints, prefix)
+        package_builder.scan_requirements_txt(spotfire_requirements, constraints, prefix)
         if hook is not None:
             hook.scan_finished(package_builder)
 
         # Build the package
         package_builder.build()
     finally:
-        cleanup()
+        package_builder.cleanup()
 
 
 @subcommand([argument("spk-file", help="path to the SPK file to build"),
@@ -736,9 +754,6 @@ def python(args, hook=None) -> None:
 def packages(args) -> None:
     """Package a list of Python packages as an SPK package"""
     # pylint: disable=too-many-statements
-
-    def cleanup():
-        """Dummy cleanup function."""
 
     try:
         # Set up the package builder
@@ -783,8 +798,8 @@ def packages(args) -> None:
             prefix = "root/python"
             prefix_direct = False
         constraints = getattr(args, "constraint")
-        cleanup, installed_packages = package_builder.scan_requirements_txt(requirements_file, constraints, prefix,
-                                                                            prefix_direct, True)
+        installed_packages = package_builder.scan_requirements_txt(requirements_file, constraints, prefix,
+                                                                   prefix_direct, True)
 
         # Based on the packages we installed, determine how to increment the version number
         _handle_versioning(package_builder, installed_packages, brand, brand_subkey, version, force, versioned_filename)
@@ -802,7 +817,7 @@ def packages(args) -> None:
         brand[brand_subkey]["BuiltPackages"] = installed_packages
         _brand_file(requirements_file, brand, "## spotfire.spk: ")
     finally:
-        cleanup()
+        package_builder.cleanup()
 
 
 def _promote_brand(brand, analyst):
