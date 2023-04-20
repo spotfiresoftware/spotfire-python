@@ -429,7 +429,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                        'sys.path.insert(min([i for i, x in enumerate(["site-packages" in x for x in sys.path]) if x]), '
                        'f"{sys.prefix}{os.sep}spotfire-packages")\n')
         self._cleanup_files.append(temp)
-        self.add(temp, f"{prefix}/spotfire.pth")
+        self.add(temp, f"{prefix}/{self._site_packages_dirname}/spotfire.pth")
 
     @abc.abstractmethod
     def _payload_name(self) -> str:
