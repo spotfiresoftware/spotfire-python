@@ -72,7 +72,7 @@ def _error(msg: str) -> None:
 
 class _SpkVersion:
     """Represents a version number as presented in Spotfire SPK package files.  Version numbers have four components
-    (organized from largest scope to smallest): major, minor, service pack, and identifier."""
+    (organized from the largest scope to smallest): major, minor, service pack, and identifier."""
 
     def __init__(self, major: int = 1, minor: int = 0, service_pack: int = 0, identifier: int = 0) -> None:
         self._versions = [major, minor, service_pack, identifier]
@@ -82,6 +82,7 @@ class _SpkVersion:
         """Parse a string into a version.
 
         :param str_: the string to parse into a version number
+        :return: new SPK package version object
         """
         components = str_.split(".")
         if len(components) > 4:
@@ -90,7 +91,12 @@ class _SpkVersion:
 
     @staticmethod
     def from_version_info(identifier: int) -> '_SpkVersion':
-        """Extract the SPK version of the running Python installation."""
+        """Extract the SPK version of the running Python installation.
+
+        :param identifier: fourth component for the generated version object
+        :return: new SPK package version object of the form `X.YYZZ.ABBCC.identifier` (where `X.Y.Z` is the Python
+                   version, and `A.B.C` is the version of the `spotfire` package)
+        """
         spk_minor = (sys.version_info.minor * 100) + sys.version_info.micro
         spotfire_version_components = spotfire.version.__version__.split(".")
         spk_service_pack = (int(spotfire_version_components[0]) * 10000) + \
@@ -232,7 +238,11 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             os.unlink(filename)
 
     def add(self, filename: str, archive_name: str) -> None:
-        """Add a file to the package."""
+        """Add a file to the package.
+
+        :param filename: the file name on disk to add to the package
+        :param archive_name: the name within the package to add the file as
+        """
         archive_backslash = archive_name.replace("/", "\\")
         if self.excludes is not None:
             for exclude in self.excludes:
@@ -241,7 +251,10 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         self._contents.append((filename, archive_backslash))
 
     def scan_python_installation(self, prefix: str) -> None:
-        """Scan all the files in the Python installation."""
+        """Scan all the files in the Python installation.
+
+        :param prefix: the directory within the package to locate the Python installation at
+        """
         try:
             py_prefix = sys.base_prefix
         except AttributeError:
@@ -259,7 +272,10 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     self.add(filename_ondisk, filename_payload)
 
     def scan_spotfire_package(self, prefix: str) -> None:
-        """Scan the 'spotfire' package (and it's .dist-info directory) into site-packages."""
+        """Scan the 'spotfire' package (and it's .dist-info directory) into spotfire-packages.
+
+        :param prefix: the directory within the package the Python installation is located at
+        """
         _message("Scanning 'spotfire' package files.")
 
         # Grab the files of the 'spotfire' package.
@@ -288,9 +304,9 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         """Scan the contents of a pip 'requirements.txt' file into site-packages.
 
         :param requirements: the filename of the requirements file that declares the pip packages to put in the
-        SPK package
+                               SPK package
         :param constraint: the filename of the constraints file that declares the constraints pip should apply
-        when resolving requirements
+                             when resolving requirements
         :param prefix: the directory prefix under which the pip packages should be scanned into
         :param prefix_direct: whether to scan the pip packages into the ``site-packages`` directory or directly
                                 into the prefix directory
@@ -348,9 +364,14 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         return package_versions
 
     @staticmethod
-    def scan_duplicate_packages(tempdir: str, package_versions):
-        """ When building a custom Python Packages SPK, find and delete duplicate packages.
-        :return:
+    def scan_duplicate_packages(tempdir: str, package_versions: typing.Dict[str, str]) -> typing.Dict[str, str]:
+        """Find and delete duplicate packages from a directory of packages .
+
+        :param tempdir: the temporary on-disk directory to which the packages to scan for duplicates have been
+                          downloaded
+        :param package_versions: the dictionary returned by :method:`scan_requirements_txt` that maps package names
+                                   to versions
+        :return: `package_versions`, but with duplicate packages removed from the mapping
         """
         # pylint: disable=too-many-nested-blocks,too-many-locals
         # Use the spotfire requirements file as a deny list.
@@ -420,7 +441,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
     def scan_path_configuration_file(self, prefix: str) -> None:
         """Add a path configuration file for the 'spotfire-packages' directory to the Python interpreter.
 
-        :param prefix: the directory prefix under which the Python interpreter is located
+        :param prefix: the directory within the package the Python installation is located at
         """
         _message("Adding path configuration file for spotfire-packages directory.")
         fd, temp = tempfile.mkstemp()
@@ -606,7 +627,11 @@ class _CabPackageBuilder(_PackageBuilder):
         return f"{self.name}.cab"
 
     def add_resource(self, name: str, location: str) -> None:
-        """Add a public resource provided by this package."""
+        """Add a public resource provided by this package.
+
+        :param name: name of the resource to add to this package
+        :param location: the location within the package the resource refers to
+        """
         self._resources.append((name, location))
 
     def _create_module(self) -> ElementTree.Element:
@@ -820,7 +845,13 @@ def packages(args) -> None:
         package_builder.cleanup()
 
 
-def _promote_brand(brand, analyst):
+def _promote_brand(brand: typing.Dict, analyst: bool) -> typing.Dict:
+    """Promote the version of a brand to the current representation.
+
+    :param brand: the brand to promote
+    :param analyst: whether the brand represents an Analyst package
+    :return: `brand`, promoted to the current version
+    """
     brand_version = brand.get("BrandVersion") or 1
 
     # Promote 1 to 2
@@ -833,7 +864,21 @@ def _promote_brand(brand, analyst):
     return brand
 
 
-def _handle_versioning(package_builder, installed_packages, brand, brand_subkey, version, force, versioned_filename):
+def _handle_versioning(package_builder: _PackageBuilder, installed_packages: typing.Dict[str, str], brand: typing.Dict,
+                       brand_subkey: str, version: typing.Optional[str], force: bool, versioned_filename: bool) -> None:
+    """Properly handle the SPK package version given the packages installed by prior versions of the SPK package
+    (from the brand) and the set of packages that were downloaded.
+
+    :param package_builder: the package builder that is building the SPK package
+    :param installed_packages: the dictionary from :method:`_PackageBuilder.scan_requirements_txt` indicating the
+                                 packages and versions that were downloaded
+    :param brand: the brand containing information about the prior version of the SPK package
+    :param brand_subkey: the name of the subkey of the brand to look for information under
+    :param version: user-specified version for the SPK package, or `None` if unspecified
+    :param force: whether the user has asked to ignore error conditions in versioning
+    :param versioned_filename: whether the user has asked to have the generated version added to the SPK package's
+                                 filename
+    """
     # pylint: disable=too-many-arguments
     package_builder.version = _SpkVersion()
     if "BuiltVersion" in brand[brand_subkey]:
@@ -857,7 +902,15 @@ def _handle_versioning(package_builder, installed_packages, brand, brand_subkey,
                                         package_builder.output, 1)
 
 
-def _should_increment_major(old_packages, new_packages, force):
+def _should_increment_major(old_packages: typing.Dict[str, str], new_packages: typing.Dict[str, str],
+                            force: bool) -> bool:
+    """Determine if the major version of the SPK package should be incremented, instead of the minor version.
+
+    :param old_packages: dictionary mapping packages to versions present in the old version of the SPK package
+    :param new_packages: dictionary mapping packages to versions present in the new version of the SPK package
+    :param force: whether the user has asked to ignore error conditions in versioning
+    :return: whether the major component of the version should be incremented
+    """
     tick_major = False
     # Check for removed packages
     if old_packages.keys() - new_packages.keys():
