@@ -323,7 +323,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
 
         # Install the packages from the requirement file into tempdir.
         _message(f"Installing pip packages from {requirements} to temporary location.")
-        command = [sys.executable, "-m", "pip", "install", "--upgrade", "--disable-pip-version-check",
+        command = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
                    "--target", tempdir, "--requirement", requirements]
         if constraint:
             command.extend(["--constraint", constraint])
