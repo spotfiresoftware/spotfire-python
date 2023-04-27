@@ -449,6 +449,8 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             file.write('import sys, os; '
                        'sys.path.insert(min([i for i, x in enumerate(["site-packages" in x for x in sys.path]) if x]), '
                        'f"{sys.prefix}{os.sep}spotfire-packages")\n')
+        if platform.system() != 'Windows':
+            os.chmod(temp, 0o644)
         self._cleanup_files.append(temp)
         self.add(temp, f"{prefix}/{self._site_packages_dirname}/spotfire.pth")
 
