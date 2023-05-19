@@ -413,3 +413,21 @@ class SbdfTest(unittest.TestCase):
             df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
             for i, col in enumerate(df2.columns):
                 self.assertEqual(type(col), str, f"df2.columns[{i}] = {repr(col)}")
+
+    def test_tz_aware_datetime(self):
+        """Verify timezone aware datetime objects export properly"""
+        now = datetime.datetime.now()
+        now_utc = now.astimezone(datetime.timezone.utc)
+        now_local = now.astimezone()
+        dataframe = pandas.DataFrame({
+            'naive': [now],
+            'utc':   [now_utc],
+            'local': [now_local]
+        })
+        now_roundtrip = now.replace(microsecond=now.microsecond // 1000 * 1000)  # SBDF has millisecond resolution
+        with tempfile.TemporaryDirectory() as tempdir:
+            sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
+            df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
+            for col in df2.columns:
+                val = df2.at[0, col]
+                self.assertEqual(val, now_roundtrip, f"df2[{col}] = {repr(val)}")

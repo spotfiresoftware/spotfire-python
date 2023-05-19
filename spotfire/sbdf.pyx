@@ -1353,11 +1353,15 @@ cdef int _export_vt_datetime(_ExportContext context, Py_ssize_t start, Py_ssize_
     shape[0] = <np_c.npy_intp>count
     cdef np_c.ndarray new_values = np_c.PyArray_ZEROS(1, shape, np_c.NPY_INT64, 0)
     cdef int i
+    current_tz = datetime.datetime.now().astimezone().tzinfo
     for i in range(count):
         if not context.invalid_array[start + i]:
             val_i = context.values_array[start + i]
             if isinstance(val_i, pd.Timestamp):
-                dt = val_i.to_pydatetime()
+                if val_i.tz:
+                    dt = val_i.tz_convert(current_tz).tz_localize(None).to_pydatetime()
+                else:
+                    dt = val_i.to_pydatetime()
             elif isinstance(val_i, np.datetime64):
                 dt = np.datetime64(val_i, "ms").astype(datetime.datetime)
             elif isinstance(val_i, datetime.datetime):
@@ -1569,7 +1573,7 @@ cdef int _export_infer_valuetype_from_pandas_dtype(series, series_description) e
         return sbdf_c.SBDF_DOUBLETYPEID
     elif dtype == "Float64":
         return sbdf_c.SBDF_DOUBLETYPEID
-    elif dtype == "datetime64[ns]":
+    elif dtype.startswith("datetime64[ns"):
         return sbdf_c.SBDF_DATETIMETYPEID
     elif dtype == "timedelta64[ns]":
         return sbdf_c.SBDF_TIMESPANTYPEID
