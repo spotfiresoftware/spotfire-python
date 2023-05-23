@@ -30,7 +30,13 @@ def main():
     parser.add_argument("--pypi-token", metavar="TOKEN", help="The PyPI API token to use")
     parser.add_argument("--gh-token", metavar="TOKEN", help="The GitHub API token to use")
     parser.add_argument("--repo", help="The owner and repository we are operating on")
+    parser.add_argument("--relnotes", metavar="FILE", help="File containing the text of the notes for the "
+                                                           "GitHub release")
     args = parser.parse_args()
+
+    # Read the release notes
+    with open(args.relnotes, "r") as relnotes_file:
+        relnotes_text = relnotes_file.read()
 
     # Connect to GitHub REST API
     gh = Github(args.gh_token)
@@ -51,13 +57,12 @@ def main():
                         print(f"Extracting {a_zip_entry}")
                         a_zip.extract(a_zip_entry, tempdir)
 
-        # Create a new draft release
-        print(f"Creating draft GH release")
+        # Create a new release
+        print(f"Creating GH release")
         gh_release = repo.create_git_release(tag=f"v{args.release}", name=args.release, target_commitish=branch,
-                                             message="_Replace with release notes._",
-                                             draft=True, prerelease=False)
+                                             message=relnotes_text, draft=False, prerelease=False)
 
-        # Upload artifacts to GH draft release
+        # Upload artifacts to GH release
         for filename in os.scandir(tempdir):
             print(f"Uploading {filename.path} to GH release")
             gh_release.upload_asset(filename.path)
