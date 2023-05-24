@@ -474,4 +474,3 @@ class SbdfTest(unittest.TestCase):
             self.assertEqual(df2.columns[0], 'x')
             val = df2.at[0, "x"]
             self.assertEqual(val[0:8], b'\x89PNG\x0d\x0a\x1a\x0a')
-
