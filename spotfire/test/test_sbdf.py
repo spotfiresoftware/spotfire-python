@@ -9,6 +9,9 @@ import pkg_resources
 import pandas
 import pandas.testing
 import geopandas
+import matplotlib.pyplot
+import seaborn
+import PIL.Image
 
 import spotfire
 from spotfire import sbdf
@@ -413,3 +416,43 @@ class SbdfTest(unittest.TestCase):
             df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
             for i, col in enumerate(df2.columns):
                 self.assertEqual(type(col), str, f"df2.columns[{i}] = {repr(col)}")
+
+    def test_image_matplot(self):
+        """Verify Matplotlib figures export properly"""
+        matplotlib.pyplot.clf()
+        fig, _ = matplotlib.pyplot.subplots()
+        with tempfile.TemporaryDirectory() as tempdir:
+            sbdf.export_data(fig, f"{tempdir}/output.sbdf")
+            df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
+            self.assertEqual(len(df2), 1)
+            self.assertEqual(len(df2.columns), 1)
+            self.assertEqual(df2.columns[0], 'x')
+            val = df2.at[0, "x"]
+            self.assertEqual(val[0:8], b'\x89PNG\x0d\x0a\x1a\x0a')
+
+    def test_image_seaborn(self):
+        """Verify Seaborn grids export properly"""
+        matplotlib.pyplot.clf()
+        dataframe = pandas.DataFrame({'x': range(10), 'y': range(10, 0, -1)})
+        grid = seaborn.FacetGrid(dataframe)
+        with tempfile.TemporaryDirectory() as tempdir:
+            sbdf.export_data(grid, f"{tempdir}/output.sbdf")
+            df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
+            self.assertEqual(len(df2), 1)
+            self.assertEqual(len(df2.columns), 1)
+            self.assertEqual(df2.columns[0], 'x')
+            val = df2.at[0, "x"]
+            self.assertEqual(val[0:8], b'\x89PNG\x0d\x0a\x1a\x0a')
+
+    def test_image_pil(self):
+        """Verify PIL images export properly"""
+        image = PIL.Image.new("RGB", (100, 100))
+        with tempfile.TemporaryDirectory() as tempdir:
+            sbdf.export_data(image, f"{tempdir}/output.sbdf")
+            df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
+            val = df2.at[0, "x"]
+            self.assertEqual(len(df2), 1)
+            self.assertEqual(len(df2.columns), 1)
+            self.assertEqual(df2.columns[0], 'x')
+            val = df2.at[0, "x"]
+            self.assertEqual(val[0:8], b'\x89PNG\x0d\x0a\x1a\x0a')
