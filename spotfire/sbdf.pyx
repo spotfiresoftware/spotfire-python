@@ -1177,7 +1177,7 @@ cdef _export_obj_matplotlib_figure(obj, default_column_name):
     cdef np_c.ndarray values
 
     context = _ExportContext()
-    context.set_valuetype(sbdf_c.sbdf_vt_binary())
+    context.set_valuetype_id(sbdf_c.SBDF_BINARYTYPEID)
     with io.BytesIO() as buf:
         obj.set_canvas(matplotlib.pyplot.gcf().canvas)
         obj.savefig(buf, format="png")
@@ -1198,7 +1198,7 @@ cdef _export_obj_seaborn_grid(obj, default_column_name):
     cdef np_c.ndarray values
 
     context = _ExportContext()
-    context.set_valuetype(sbdf_c.sbdf_vt_binary())
+    context.set_valuetype_id(sbdf_c.SBDF_BINARYTYPEID)
     with io.BytesIO() as buf:
         obj.savefig(buf)
         values = np.array([buf.getvalue()], dtype='object')
@@ -1218,9 +1218,9 @@ cdef _export_obj_pil_image(obj, default_column_name):
     cdef np_c.ndarray values
 
     context = _ExportContext()
-    context.set_valuetype(sbdf_c.sbdf_vt_binary())
+    context.set_valuetype_id(sbdf_c.SBDF_BINARYTYPEID)
     with io.BytesIO() as buf:
-        obj.save(buf)
+        obj.save(buf, format="png")
         values = np.array([buf.getvalue()], dtype='object')
         context.set_arrays(values, [False])
 
