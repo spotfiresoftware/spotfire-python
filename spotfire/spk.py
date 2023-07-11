@@ -703,7 +703,7 @@ def python(args, hook=None) -> None:
         print("Error: '--version' cannot be less than 0.")
         sys.exit(1)
     if version_identifier < 1000:
-        print("Warning: '--version' should not be less than 1000 in order to avoid conflicts with TIBCO-provided "
+        print("Warning: '--version' should not be less than 1000 in order to avoid conflicts with Spotfire-provided "
               "packages.")
 
     # Set up the package builder

@@ -99,7 +99,7 @@ extensions = [
 setup(
     name='spotfire',
     version=version['__version__'],
-    description='Package for Building Python Extensions to TIBCO Spotfire',
+    description='Package for Building Python Extensions to Spotfire',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='Cloud Software Group, Inc.',

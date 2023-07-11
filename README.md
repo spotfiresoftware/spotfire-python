@@ -1,4 +1,4 @@
-# Package for Building Python Extensions to TIBCO Spotfire® 
+# Package for Building Python Extensions to Spotfire® 
 
 This package provides functions used for integrating Python with Spotfire, including: 
 * reading and writing files in Spotfire Binary Data Format (SBDF)
