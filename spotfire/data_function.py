@@ -15,6 +15,9 @@ import re
 from spotfire import sbdf, _utils
 
 
+_COLUMN_METADATA_TRUNCATE_THRESHOLD = 80000
+
+
 def _bad_string(str_: typing.Any) -> bool:
     return not isinstance(str_, str)
 
@@ -84,6 +87,8 @@ class AnalyticInput:
         :param globals_dict: dict containing the global variables for the data function
         :param debug_fn: logging function for debug messages
         """
+        # pylint: disable=too-many-branches
+
         if self.type == "NULL":
             debug_fn(f"assigning missing '{self.name}' as None")
             globals_dict[self.name] = None
@@ -91,22 +96,41 @@ class AnalyticInput:
         debug_fn(f"assigning {self.type} '{self.name}' from file {self.file}")
         dataframe = sbdf.import_data(self.file)
         debug_fn(f"read {dataframe.shape[0]} rows {dataframe.shape[1]} columns")
+
+        # Table metadata
         try:
-            table_meta = dataframe.spotfire_table_metadata
+            if dataframe.spotfire_table_metadata:
+                table_meta = f"\n {pprint.pformat(dataframe.spotfire_table_metadata)}"
+            else:
+                table_meta = " (no table metadata present)"
         except AttributeError:
-            table_meta = {}
-        column_meta = {}
+            table_meta = " (no table metadata present)"
+        debug_fn(f"table metadata:{table_meta}")
+
+        # Column metadata
+        column_blank = False
+        pretty_column = io.StringIO()
         for col in dataframe.columns:
             try:
-                column_meta[col] = dataframe[col].spotfire_column_metadata
+                if pretty_column.tell() > _COLUMN_METADATA_TRUNCATE_THRESHOLD:
+                    pretty_column.write("\n (truncated due to length)")
+                    break
+                if dataframe[col].spotfire_column_metadata:
+                    pretty_column.write(f"\n {col}: {pprint.pformat(dataframe[col].spotfire_column_metadata)}")
+                else:
+                    column_blank = True
             except AttributeError:
-                column_meta[col] = {}
-        pretty_table = io.StringIO()
-        pretty_column = io.StringIO()
-        pprint.pprint(table_meta, pretty_table)
-        pprint.pprint(column_meta, pretty_column)
-        debug_fn(f"table metadata: \n {pretty_table.getvalue()}")
-        debug_fn(f"column metadata: \n {pretty_column.getvalue()}")
+                column_blank = True
+        if pretty_column.tell() != 0:
+            column_meta = pretty_column.getvalue()
+        else:
+            column_meta = " (no column metadata present)"
+            column_blank = False
+        if column_blank:
+            column_meta += "\n (columns without metadata have been omitted)"
+        debug_fn(f"column metadata:{column_meta}")
+
+        # Argument type
         if self.type == "column":
             dataframe = dataframe[dataframe.columns[0]]
         if self.type == "value":
@@ -121,6 +145,8 @@ class AnalyticInput:
                 dataframe = None
             else:
                 dataframe = value
+
+        # Store to global dict
         globals_dict[self.name] = dataframe
 
 
