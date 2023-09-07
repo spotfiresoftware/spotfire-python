@@ -16,7 +16,8 @@ from spotfire import sbdf, data_function as datafn, _utils
 class DataFunctionTest(unittest.TestCase):
     """Unit tests for public functions in 'spotfire.data_function' module."""
     # pylint: disable=too-many-branches, too-many-statements, too-many-arguments, too-many-public-methods, line-too-long
-    def _run_analytic(self, script, inputs, outputs, success, expected_result):
+
+    def _run_analytic(self, script, inputs, outputs, success, expected_result, debug=False) -> None:
         """Run a full pass through the analytic protocol, and compare the output to the expected value."""
         # pylint: disable=protected-access,too-many-locals
         with _utils.TempFiles() as temp_files:
@@ -45,7 +46,8 @@ class DataFunctionTest(unittest.TestCase):
                 tmp.close()
                 output_spec.append(datafn.AnalyticOutput(k, tmp.name))
             spec = datafn.AnalyticSpec("script", input_spec, output_spec, script)
-            # spec.enable_debug()
+            if debug:
+                spec.enable_debug()
             print("test: created analytic spec")
             print(repr(spec))
 
@@ -67,7 +69,7 @@ class DataFunctionTest(unittest.TestCase):
                 print("test: --- start expected result ---")
                 print(expected)
                 print("test: --- end expected result ---")
-            self.assertEqual(re.sub(", line \\d+,", ",", expected), re.sub(", line \\d+,", ",", actual_result_str))
+            self.assertEqual(self._process_log_message(expected), self._process_log_message(actual_result_str))
             if not actual_result.success:
                 print("test: data function has failed")
             self.assertEqual(actual_result.success, success)
@@ -96,6 +98,14 @@ class DataFunctionTest(unittest.TestCase):
                         print("\nWARNING: outputs did not match\n")
                 else:
                     print("test: file doesn't exist")
+
+    def _process_log_message(self, msg):
+        # Remove line numbers from exception tracebacks
+        msg = re.sub(", line \\d+,", ",", msg)
+        # Remove temporary file names
+        msg = re.sub(r"file [^ ]+\.sbdf", "file temp.sbdf", msg)
+
+        return msg
 
     def _assert_table_metadata_equal(self, first, second, msg=None):
         """Test that two data frames have the same metadata."""
@@ -543,3 +553,118 @@ Traceback (most recent call last):
   File "<data_function>", in <module>
 ValueError: root exception
 """)
+
+    def test_debug_log(self):
+        """Test that the debug log can be enabled"""
+        in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            in1_df.spotfire_table_metadata = {"tbl_1": [1]}
+        in1_df["a"].spotfire_column_metadata = {"col_a_1": [10]}
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, """
+Debug log:
+debug: start evaluate
+debug: reading 1 input variables
+debug: assigning table 'in1' from file temp.sbdf
+debug: read 5 rows 1 columns
+debug: table metadata:
+ {'tbl_1': [1]}
+debug: column metadata:
+ a: {'col_a_1': [10]}
+debug: done reading 1 input variables
+debug: executing script
+debug: --- script ---
+in1
+debug: --- script ---
+debug: analytic_type is 'script'
+debug: done executing script
+debug: writing 0 output variables
+debug: done writing 0 output variables
+debug: end evaluate
+""", debug=True)
+
+    def test_debug_log_omit(self):
+        """Test that blank metadata is omitted from the debug log"""
+        # All columns have no metadata
+        in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, """
+Debug log:
+debug: start evaluate
+debug: reading 1 input variables
+debug: assigning table 'in1' from file temp.sbdf
+debug: read 5 rows 1 columns
+debug: table metadata: (no table metadata present)
+debug: column metadata: (no column metadata present)
+debug: done reading 1 input variables
+debug: executing script
+debug: --- script ---
+in1
+debug: --- script ---
+debug: analytic_type is 'script'
+debug: done executing script
+debug: writing 0 output variables
+debug: done writing 0 output variables
+debug: end evaluate
+""", debug=True)
+
+        # Some columns have no metadata
+        in2_df = pd.DataFrame({"a": [1, 2, 3, 4, 5], "b": [6, 7, 8, 9, 10]})
+        in2_df['b'].spotfire_column_metadata = {"col_b_1": [11]}
+        self._run_analytic("in2", {"in2": in2_df}, {}, True, """
+Debug log:
+debug: start evaluate
+debug: reading 1 input variables
+debug: assigning table 'in2' from file temp.sbdf
+debug: read 5 rows 2 columns
+debug: table metadata: (no table metadata present)
+debug: column metadata:
+ b: {'col_b_1': [11]}
+ (columns without metadata have been omitted)
+debug: done reading 1 input variables
+debug: executing script
+debug: --- script ---
+in2
+debug: --- script ---
+debug: analytic_type is 'script'
+debug: done executing script
+debug: writing 0 output variables
+debug: done writing 0 output variables
+debug: end evaluate
+""", debug=True)
+
+    def test_debug_log_truncate(self):
+        """Test that column metadata is truncated properly"""
+        in1_dict = {}
+        for i in range(10000):
+            in1_dict[f"num{i}"] = [i, i+1, i+2]
+        in1_df = pd.DataFrame(in1_dict)
+        for i in range(10000):
+            in1_df[f"num{i}"].spotfire_column_metadata = {f"col_num{i}_1": [i]}
+
+        def expected():
+            expect = """
+Debug log:
+debug: start evaluate
+debug: reading 1 input variables
+debug: assigning table 'in1' from file temp.sbdf
+debug: read 3 rows 10000 columns
+debug: table metadata: (no table metadata present)
+debug: column metadata:
+"""
+            for i in range(2315):
+                expect += f" num{i}: {{'col_num{i}_1': [{i}]}}\n"
+            expect += """ (truncated due to length)
+debug: done reading 1 input variables
+debug: executing script
+debug: --- script ---
+in1
+debug: --- script ---
+debug: analytic_type is 'script'
+debug: done executing script
+debug: writing 0 output variables
+debug: done writing 0 output variables
+debug: end evaluate
+"""
+            return expect
+
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, debug=True)
