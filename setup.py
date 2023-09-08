@@ -105,7 +105,7 @@ setup(
     author='Cloud Software Group, Inc.',
     maintainer='Spotfire Python Package Support',
     maintainer_email='spotfirepython@tibco.com',
-    url='https://github.com/TIBCOSoftware/spotfire-python',
+    url='https://github.com/spotfiresoftware/spotfire-python',
     license='BSD 3-Clause License',
     packages=find_packages(exclude=['spotfire.test.files']),
     ext_modules=extensions,
