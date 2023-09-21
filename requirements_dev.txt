@@ -6,4 +6,4 @@ matplotlib
 pillow
 seaborn
 shapely
-Cython
+Cython >= 3.0

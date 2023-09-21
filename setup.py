@@ -63,14 +63,12 @@ extensions = [
                        "spotfire/cabfile_helpers.c",
                        ],
               include_dirs=["spotfire"],
-              libraries=cabfile_libraries,
-              cython_c_in_temp=True
+              libraries=cabfile_libraries
               ),
     Extension("spotfire.codesign",
               sources=["spotfire/codesign.pyx"],
               include_dirs=codesign_includes,
-              libraries=codesign_libraries,
-              cython_c_in_temp=True
+              libraries=codesign_libraries
               ),
     Extension("spotfire.sbdf",
               sources=["spotfire/sbdf.pyx",
@@ -90,9 +88,9 @@ extensions = [
                        "vendor/sbdf-c/src/tableslice.c",
                        "vendor/sbdf-c/src/valuetype.c",
                        ],
-              define_macros=[("SBDF_STATIC", None)],
-              include_dirs=["spotfire", "vendor/sbdf-c/include", np.get_include()],
-              cython_c_in_temp=True
+              define_macros=[("SBDF_STATIC", None),
+                             ("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+              include_dirs=["spotfire", "vendor/sbdf-c/include", np.get_include()]
               ),
 ]
 
