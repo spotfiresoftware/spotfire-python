@@ -79,9 +79,15 @@ class SBDFWarning(Warning):
 
 
 ### Utility functions and definitions for managing data types
-DEF _USECS_PER_MSEC = 1000
-DEF _MSECS_PER_SEC = 1000
-DEF _SECS_PER_DAY = 86400
+cdef extern from *:
+    """
+    #define _USECS_PER_MSEC 1000
+    #define _MSECS_PER_SEC  1000
+    #define _SECS_PER_DAY   86400
+    """
+    int _USECS_PER_MSEC
+    int _MSECS_PER_SEC
+    int _SECS_PER_DAY
 
 
 cdef object _timedelta_from_msec(long long msec):
@@ -100,7 +106,11 @@ cdef object _DATETIME_EPOCH = datetime.datetime(1, 1, 1)
 cdef object _TIMEDELTA_ONE_MSEC = _timedelta_from_msec(1)
 
 
-DEF _DECIMAL_EXPONENT_BIAS = 6176
+cdef extern from *:
+    """
+    #define _DECIMAL_EXPONENT_BIAS 6176
+    """
+    int _DECIMAL_EXPONENT_BIAS
 
 
 cdef object _decimal_from_bytes(_SbdfDecimal* value):
