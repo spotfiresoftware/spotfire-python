@@ -11,7 +11,7 @@ cdef extern from "sbdf_helpers.h":
     struct _AllocatedList:
         pass
     ctypedef void(*_allocated_dealloc_fn)(void *)
-    void _allocated_list_new(_AllocatedList* alist, int capacity)
+    void _allocated_list_new(_AllocatedList* alist, Py_ssize_t capacity)
     void _allocated_list_add(_AllocatedList* alist, void* allocated)
     void _allocated_list_done(_AllocatedList* alist, _allocated_dealloc_fn fun)
 

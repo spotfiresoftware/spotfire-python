@@ -13,14 +13,14 @@ extern FILE *_pathlike_to_fileptr(PyObject *file, const char* mode);
 
 /* Utility functions for managing a list of allocated C pointers and to clean them up with a specific function */
 struct _AllocatedList {
-    int count;
-    int capacity;
+    Py_ssize_t count;
+    Py_ssize_t capacity;
     void **allocated;
 };
 
 typedef void(*_allocated_dealloc_fn)(void *);
 
-extern void _allocated_list_new(struct _AllocatedList *alist, int capacity);
+extern void _allocated_list_new(struct _AllocatedList *alist, Py_ssize_t capacity);
 extern void _allocated_list_add(struct _AllocatedList *alist, void *allocated);
 extern void _allocated_list_done(struct _AllocatedList *alist, _allocated_dealloc_fn fun);
 

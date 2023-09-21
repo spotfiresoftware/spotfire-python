@@ -41,7 +41,7 @@ FILE *_pathlike_to_fileptr(PyObject *file, const char* mode) {
 }
 
 /* Utility functions for managing a list of allocated C pointers and to clean them up with a specific function */
-void _allocated_list_new(struct _AllocatedList *alist, int capacity) {
+void _allocated_list_new(struct _AllocatedList *alist, Py_ssize_t capacity) {
     alist->count = 0;
     alist->capacity = capacity;
     alist->allocated = PyMem_RawMalloc(capacity * sizeof(struct _AllocatedList));
