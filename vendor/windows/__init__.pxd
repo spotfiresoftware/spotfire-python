@@ -1,11 +1,13 @@
 cdef extern from "<windows.h>" nogil:
     # Types defined at https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
     ctypedef bint BOOL
+    ctypedef const char* LPCSTR
     ctypedef const Py_UNICODE* LPCWSTR
     ctypedef unsigned long DWORD
     ctypedef void* HANDLE
     ctypedef int HRESULT
     ctypedef Py_ssize_t INT_PTR
+    ctypedef Py_ssize_t ULONG_PTR
 
     # Preprocessor definitions defined at https://docs.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
     cdef enum:

@@ -7,6 +7,10 @@
 """Tools to apply Authenticode code signing signatures and timestamps to files using the native Microsoft APIs.
 Only runs on Windows platforms."""
 
+cpdef enum CertificateStoreLocation:
+    CURRENT_USER = 1
+    LOCAL_MACHINE = 2
+
 IF UNAME_SYSNAME == "Windows":
 
     import os
@@ -32,11 +36,12 @@ IF UNAME_SYSNAME == "Windows":
     cpdef void codesign_file(filename,
                              certificate,
                              windows.LPCWSTR password,
-                             windows.LPCWSTR timestamp = NULL,
+                             timestamp = None,
                              bint use_rfc3161 = False,
                              bint use_sha256 = False) except *:
-        """Codesign a file using the Microsoft signing API found in mssign32.dll.
-    
+        """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a PFX file
+        or PKCS#12 container.
+
         :param filename: the filename of the file to codesign
         :param certificate: the filename of the certificate file to codesign with
         :param password: the password used to unlock the certificate
@@ -46,13 +51,107 @@ IF UNAME_SYSNAME == "Windows":
         :param use_sha256: whether or not to use SHA-256 as the timestamping hash function.  If ``True``, use SHA-256.
           If ``False``, use SHA-1.
         """
+        cdef wincrypt.CRYPT_DATA_BLOB cert_blob
+        cdef windows.HANDLE cert_store = NULL
+        cdef windows.LPCWSTR timestamp_wstr = NULL
+
+        try:
+            # Sanity check arguments
+            if not os.path.isfile(certificate):
+                raise FileNotFoundError(f"No such file: '{certificate}'")
+
+            # Open the certificate file and convert it into an in-memory cert store
+            with open(certificate, "rb") as cert:
+                cert_data = cert.read()
+            cert_blob.cbData = <windows.DWORD>len(cert_data)
+            cert_blob.pbData = <char*>cert_data
+            cert_store = wincrypt.PFXImportCertStore(&cert_blob, password, 0)
+            if cert_store is NULL:
+                cert_store = wincrypt.PFXImportCertStore(&cert_blob, _empty_wstring, 0)
+            if cert_store is NULL:
+                cert_store = wincrypt.PFXImportCertStore(&cert_blob, NULL, 0)
+            if cert_store is NULL:
+                raise CodesignError(f"Could not load certificate {certificate}; is the password correct?")
+
+            # Handle optional values
+            if timestamp is not None:
+                timestamp_pystr = str(timestamp)
+                timestamp_wstr = timestamp_pystr
+
+            # Call the common signing code
+            _codesign_file_core(filename, cert_store, wincrypt.CERT_FIND_ANY, NULL, timestamp_wstr,
+                                use_rfc3161, use_sha256)
+        finally:
+            if cert_store is not NULL:
+                wincrypt.CertCloseStore(cert_store, wincrypt.CERT_CLOSE_STORE_CHECK_FLAG)
+
+    cpdef void codesign_file_from_store(filename,
+                                        CertificateStoreLocation store_location,
+                                        windows.LPCWSTR store_name,
+                                        windows.LPCWSTR store_cn,
+                                        timestamp = None,
+                                        bint use_rfc3161 = False,
+                                        bint use_sha256 = False) except *:
+        """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a system
+        certificate store.
+    
+        :param filename: the filename of the file to codesign
+        :param store_location: the location of the Windows certificate store to find the certificate to sign with in
+        :param store_name: the name of the Windows certificate store to find the certificate to sign with in
+        :param store_cn: a string specifying the subject common name (or a substring thereof) of the certificate to
+          sign with
+        :param timestamp: a URL of the timestamping service to timestamp the code signature with
+        :param use_rfc3161: whether or not to use the RFC 3161 timestamping protocol.  If ``True``, use RFC 3161.
+          If ``False``, use Authenticode.
+        :param use_sha256: whether or not to use SHA-256 as the timestamping hash function.  If ``True``, use SHA-256.
+          If ``False``, use SHA-1.
+        """
+        cdef windows.HANDLE cert_store = NULL
+        cdef windows.DWORD cert_location
+        cdef windows.LPCWSTR timestamp_wstr = NULL
+
+        try:
+            # Sanity check arguments
+            if store_name is None or len(store_name) == 0:
+                raise ValueError("System certificate store name is empty")
+            if store_cn is None or len(store_cn) == 0:
+                raise ValueError("System store certificate common name is empty")
+
+            # Open the system store
+            if store_location == CertificateStoreLocation.CURRENT_USER:
+                cert_location = wincrypt.CERT_SYSTEM_STORE_CURRENT_USER
+            elif store_location == CertificateStoreLocation.LOCAL_MACHINE:
+                cert_location = wincrypt.CERT_SYSTEM_STORE_LOCAL_MACHINE
+            else:
+                raise ValueError(f"Unknown local store location '{store_location}'")
+            cert_store = wincrypt.CertOpenStore(wincrypt.CERT_STORE_PROV_SYSTEM_W, 0, 0, cert_location, store_name)
+            if cert_store is NULL:
+                raise CodesignError("Could not open system store")
+
+            # Handle optional values
+            if timestamp is not None:
+                timestamp_pystr = str(timestamp)
+                timestamp_wstr = timestamp_pystr
+
+            # Call the common signing code
+            _codesign_file_core(filename, cert_store, wincrypt.CERT_FIND_SUBJECT_STR_W, store_cn, timestamp_wstr,
+                                use_rfc3161, use_sha256)
+        finally:
+            if cert_store is not NULL:
+                wincrypt.CertCloseStore(cert_store, wincrypt.CERT_CLOSE_STORE_CHECK_FLAG)
+
+    cdef void _codesign_file_core(filename,
+                                  windows.HANDLE cert_store,
+                                  windows.DWORD cert_find_type,
+                                  windows.LPCWSTR cert_find_param,
+                                  windows.LPCWSTR timestamp,
+                                  bint use_rfc3161,
+                                  bint use_sha256) except *:
         cdef windows.HANDLE mssign32_library = NULL
         cdef mssign32.SignerSignExType signer_sign_ex_fun
         cdef mssign32.SignerTimeStampType signer_time_stamp_fun
         cdef mssign32.SignerTimeStampEx2Type signer_time_stamp_ex2_fun
         cdef mssign32.SignerFreeSignerContextType signer_free_signer_context_fun
-        cdef wincrypt.CRYPT_DATA_BLOB cert_blob
-        cdef windows.HANDLE cert_store = NULL
         cdef const wincrypt.CERT_CONTEXT* cert_context = NULL
         cdef windows.DWORD key_spec, key_spec_len
         cdef mssign32.SIGNER_FILE_INFO signer_file_info
@@ -68,8 +167,6 @@ IF UNAME_SYSNAME == "Windows":
             # Sanity check arguments
             if not os.path.isfile(filename):
                 raise FileNotFoundError(f"No such file: '{filename}'")
-            if not os.path.isfile(certificate):
-                raise FileNotFoundError(f"No such file: '{certificate}'")
             if use_sha256 and not use_rfc3161:
                 raise ValueError("SHA-256 timestamping requires the RFC 3161 timestamping protocol")
 
@@ -90,23 +187,10 @@ IF UNAME_SYSNAME == "Windows":
             if signer_free_signer_context_fun is NULL:
                 raise CodesignError("Cannot find function 'SignerFreeSignerContext'")
 
-            # Open the certificate file and convert it into an in-memory cert store
-            with open(certificate, "rb") as cert:
-                cert_data = cert.read()
-            cert_blob.cbData = <windows.DWORD>len(cert_data)
-            cert_blob.pbData = <char*>cert_data
-            cert_store = wincrypt.PFXImportCertStore(&cert_blob, password, 0)
-            if cert_store is NULL:
-                cert_store = wincrypt.PFXImportCertStore(&cert_blob, _empty_wstring, 0)
-            if cert_store is NULL:
-                cert_store = wincrypt.PFXImportCertStore(&cert_blob, NULL, 0)
-            if cert_store is NULL:
-                raise CodesignError(f"Could not load certificate {certificate}; is the password correct?")
-
-            # Extract the cert from the new cert store
+            # Extract the cert from the store
             cert_context = wincrypt.CertFindCertificateInStore(cert_store,
                                                                wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
-                                                               0, wincrypt.CERT_FIND_ANY, NULL, NULL)
+                                                               0, cert_find_type, cert_find_param, NULL)
             if cert_context is NULL:
                 raise CodesignError("Could not get certificate from store")
             found_private_key = False
@@ -120,7 +204,7 @@ IF UNAME_SYSNAME == "Windows":
                 else:
                     cert_context = wincrypt.CertFindCertificateInStore(cert_store,
                                                                        wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
-                                                                       0, wincrypt.CERT_FIND_ANY, NULL, cert_context)
+                                                                       0, cert_find_type, cert_find_param, cert_context)
                     if cert_context is NULL:
                         raise CodesignError("Could not get certificate from store")
 
@@ -182,19 +266,36 @@ IF UNAME_SYSNAME == "Windows":
         finally:
             if cert_context is not NULL:
                 wincrypt.CertFreeCertificateContext(cert_context)
-            if cert_store is not NULL:
-                wincrypt.CertCloseStore(cert_store, wincrypt.CERT_CLOSE_STORE_CHECK_FLAG)
             if mssign32_library is not NULL:
                 windows.FreeLibrary(mssign32_library)
 
 ELSE:
 
     def codesign_file(filename, certificate, password, timestamp = None, use_rfc3161 = False, use_sha256 = False):
-        """Codesign a file using the Microsoft signing API found in mssign32.dll.
+        """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a PFX file
+        or PKCS#12 container.
 
         :param filename: the filename of the file to codesign
         :param certificate: the filename of the certificate file to codesign with
         :param password: the password used to unlock the certificate
+        :param timestamp: a URL of the timestamping service to timestamp the code signature with
+        :param use_rfc3161: whether or not to use the RFC 3161 timestamping protocol.  If ``True``, use RFC 3161.
+          If ``False``, use Authenticode.
+        :param use_sha256: whether or not to use SHA-256 as the timestamping hash function.  If ``True``, use SHA-256.
+          If ``False``, use SHA-1.
+        """
+        raise OSError("Codesigning not supported on non-Win32 platforms")
+
+    def codesign_file_from_store(filename, store_location, store_name, store_cn, timestamp = None, use_rfc3161 = False,
+                                 use_sha256 = False):
+        """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a system
+        certificate store.
+
+        :param filename: the filename of the file to codesign
+        :param store_location: the location of the Windows certificate store to find the certificate to sign with in
+        :param store_name: the name of the Windows certificate store to find the certificate to sign with in
+        :param store_cn: a string specifying the subject common name (or a substring thereof) of the certificate to
+          sign with
         :param timestamp: a URL of the timestamping service to timestamp the code signature with
         :param use_rfc3161: whether or not to use the RFC 3161 timestamping protocol.  If ``True``, use RFC 3161.
           If ``False``, use Authenticode.

@@ -35,6 +35,15 @@ cdef extern from "<wincrypt.h>" nogil:
     # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-pfximportcertstore
     windows.HANDLE PFXImportCertStore(CRYPT_DATA_BLOB*, windows.LPCWSTR, windows.DWORD)
 
+    # Function defined at https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certopenstore
+    windows.HANDLE CertOpenStore(windows.LPCSTR, windows.DWORD, windows.ULONG_PTR, windows.DWORD, void*)
+
+    # Preprocessor definitions for CertOpenStore function
+    cdef enum:
+        CERT_SYSTEM_STORE_CURRENT_USER
+        CERT_SYSTEM_STORE_LOCAL_MACHINE
+    char* CERT_STORE_PROV_SYSTEM_W
+
     # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certclosestore
     windows.BOOL CertCloseStore(windows.HANDLE, windows.DWORD)
 
@@ -49,6 +58,7 @@ cdef extern from "<wincrypt.h>" nogil:
     # Preprocessor definitions for CertFindCertificateInStore
     cdef enum:
         CERT_FIND_ANY
+        CERT_FIND_SUBJECT_STR_W
 
     # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetcertificatecontextproperty
     windows.BOOL CertGetCertificateContextProperty(CERT_CONTEXT*, windows.DWORD, void*, windows.DWORD*)
