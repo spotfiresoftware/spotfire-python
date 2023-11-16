@@ -580,6 +580,9 @@ class _CabPackageBuilder(_PackageBuilder):
         super().__init__()
         self.cert_file = None
         self.cert_password = None
+        self.cert_store_machine = False
+        self.cert_store_name = None
+        self.cert_store_cn = None
         self.timestamp_url = None
         self.sha256 = False
         self._resources = []
@@ -628,7 +631,14 @@ class _CabPackageBuilder(_PackageBuilder):
             payload.writestr("module.xml", _et_to_bytes(module))
 
         # Codesign the payload
-        if self.cert_file:
+        if self.cert_store_name and self.cert_store_cn:
+            if self.cert_store_machine:
+                store_location = codesign.CertificateStoreLocation.LOCAL_MACHINE
+            else:
+                store_location = codesign.CertificateStoreLocation.CURRENT_USER
+            codesign.codesign_file_from_store(payload_dest, store_location, self.cert_store_name, self.cert_store_cn,
+                                              self.timestamp_url, self.sha256, self.sha256)
+        elif self.cert_file:
             codesign.codesign_file(payload_dest, self.cert_file, self.cert_password, self.timestamp_url, self.sha256,
                                    self.sha256)
 
@@ -645,6 +655,14 @@ class _CabPackageBuilder(_PackageBuilder):
              argument("--cert", metavar="FILE", help="path to the certificate file to sign the package with (Analyst "
                                                      "only)"),
              argument("--password", help="password for the certificate file (Analyst only)"),
+             argument("--store-machine", action="store_true", help="Use the 'local machine' certificate store "
+                                                                   "location to sign the package instead of the "
+                                                                   "'current user' (Analyst only)"),
+             argument("--store-name", metavar="STORE", help="name of the certificate store to find the certificate "
+                                                            "to sign the package in (Analyst only)"),
+             argument("--store-cn", metavar="STRING", help="substring of the subject common name of the certificate "
+                                                           "in the certificate store to sign the package with (Analyst "
+                                                           "only)"),
              argument("--timestamp", metavar="URL", help="URL of a timestamping service to timestamp the package with "
                                                          "(Analyst only)"),
              argument("--sha256", action="store_true", help="use SHA-256 for file and timestamp digests (Analyst only)")
@@ -668,6 +686,9 @@ def python(args, hook=None) -> None:
         package_builder.excludes = getattr(args, "exclude")
         package_builder.cert_file = getattr(args, "cert")
         package_builder.cert_password = getattr(args, "password")
+        package_builder.cert_store_machine = getattr(args, "store_machine")
+        package_builder.cert_store_name = getattr(args, "store_name")
+        package_builder.cert_store_cn = getattr(args, "store_cn")
         package_builder.timestamp_url = getattr(args, "timestamp")
         package_builder.sha256 = getattr(args, "sha256")
     else:
@@ -731,6 +752,14 @@ def python(args, hook=None) -> None:
              argument("--cert", metavar="FILE", help="path to the certificate file to sign the package with (Analyst "
                                                      "only)"),
              argument("--password", help="password for the certificate file (Analyst only)"),
+             argument("--store-machine", action="store_true", help="Use the 'local machine' certificate store "
+                                                                   "location to sign the package instead of the "
+                                                                   "'current user' (Analyst only)"),
+             argument("--store-name", metavar="STORE", help="name of the certificate store to find the certificate "
+                                                            "to sign the package in (Analyst only)"),
+             argument("--store-cn", metavar="STRING", help="substring of the subject common name of the certificate "
+                                                           "in the certificate store to sign the package with (Analyst "
+                                                           "only)"),
              argument("--timestamp", metavar="URL", help="URL of a timestamping service to timestamp the package with "
                                                          "(Analyst only)"),
              argument("--sha256", action="store_true", help="use SHA-256 for file and timestamp digests (Analyst only)")
@@ -748,6 +777,9 @@ def packages(args) -> None:
             package_builder = _CabPackageBuilder()
             package_builder.cert_file = getattr(args, "cert")
             package_builder.cert_password = getattr(args, "password")
+            package_builder.cert_store_machine = getattr(args, "store_machine")
+            package_builder.cert_store_name = getattr(args, "store_name")
+            package_builder.cert_store_cn = getattr(args, "store_cn")
             package_builder.timestamp_url = getattr(args, "timestamp")
             package_builder.sha256 = getattr(args, "sha256")
         else:

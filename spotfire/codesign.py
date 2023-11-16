@@ -11,6 +11,7 @@ if sys.platform == "win32":
     # pylint: disable=invalid-name,too-few-public-methods,attribute-defined-outside-init
     import ctypes
     from ctypes import wintypes
+    import enum
     import os
     import typing
 
@@ -20,7 +21,11 @@ if sys.platform == "win32":
     _X509_ASN_ENCODING = 0x00010000
     _PKCS_7_ASN_ENCODING = 0x00000001
 
+    _CERT_STORE_PROV_SYSTEM_W = b"System"
+    _CERT_SYSTEM_STORE_CURRENT_USER = 0x00010000
+    _CERT_SYSTEM_STORE_LOCAL_MACHINE = 0x00020000
     _CERT_FIND_ANY = 0
+    _CERT_FIND_SUBJECT_STR_W = 0x00080007
     _CERT_KEY_SPEC_PROP_ID = 6
     _CERT_CLOSE_STORE_CHECK_FLAG = 2
 
@@ -101,6 +106,15 @@ if sys.platform == "win32":
                                             [ctypes.POINTER(_CRYPT_DATA_BLOB),
                                              wintypes.LPCWSTR,
                                              wintypes.DWORD])
+
+    _cert_open_store = _wrap_function(ctypes.windll.crypt32,
+                                      "CertOpenStore",
+                                      wintypes.HANDLE,
+                                      [wintypes.LPCSTR,
+                                       wintypes.DWORD,
+                                       wintypes.LPVOID,
+                                       wintypes.DWORD,
+                                       ctypes.c_void_p])
 
     _cert_close_store = _wrap_function(ctypes.windll.crypt32,
                                        "CertCloseStore",
@@ -201,7 +215,74 @@ if sys.platform == "win32":
             cert_store = _open_certificate(certificate, password)
 
             # Extract the cert from the new cert store
-            cert_context = _extract_certificate(cert_store)
+            cert_context = _extract_certificate(cert_store, _CERT_FIND_ANY, None)
+
+            # Prepare structures
+            index = wintypes.DWORD()
+            signer_subject_info = _create_subject(index, filename)
+
+            # Sign the file
+            _sign(cert_context, use_sha256, signer_subject_info)
+
+            # Timestamp the file
+            _timestamp(signer_subject_info, timestamp, use_rfc3161, use_sha256)
+
+        finally:
+            try:
+                if cert_context is not None:
+                    _cert_free_context(cert_context)
+            except NameError:
+                pass
+
+            try:
+                if cert_store is not None:
+                    _cert_close_store(cert_store, _CERT_CLOSE_STORE_CHECK_FLAG)
+            except NameError:
+                pass
+
+
+    class CertificateStoreLocation(enum.IntEnum):
+        CURRENT_USER = 1
+        LOCAL_MACHINE = 2
+
+    # noinspection PyUnboundLocalVariable
+    def codesign_file_from_store(filename: str,
+                                 store_location: CertificateStoreLocation,
+                                 store_name: str,
+                                 store_cn: str,
+                                 timestamp: typing.Optional[str] = None,
+                                 use_rfc3161: bool = False,
+                                 use_sha256: bool = False) -> None:
+        """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a system
+        certificate store.
+
+        :param filename: the filename of the file to codesign
+        :param store_location: the location of the Windows certificate store to find the certificate to sign with in
+        :param store_name: the name of the Windows certificate store to find the certificate to sign with in
+        :param store_cn: a string specifying the subject common name (or a substring thereof) of the certificate to
+          sign with
+        :param timestamp: a URL of the timestamping service to timestamp the code signature with
+        :param use_rfc3161: whether or not to use the RFC 3161 timestamping protocol.  If ``True``, use RFC 3161.
+          If ``False``, use Authenticode.
+        :param use_sha256: whether or not to use SHA-256 as the timestamping hash function.  If ``True``, use SHA-256.
+          If ``False``, use SHA-1.
+        """
+        try:
+            # Sanity check arguments
+            if not os.path.isfile(filename):
+                raise FileNotFoundError(f"No such file: '{filename}'")
+            if store_name is None or len(store_name) == 0:
+                raise ValueError("System certificate store name is empty")
+            if store_cn is None or len(store_cn) == 0:
+                raise ValueError("System store certificate common name is empty")
+            if use_sha256 and not use_rfc3161:
+                raise Exception("SHA-256 timestamping requires the RFC 3161 timestamping protocol")
+
+            # Open the certificate file and convert it into an in-memory cert store
+            cert_store = _open_store(store_location, store_name)
+
+            # Extract the cert from the new cert store
+            cert_context = _extract_certificate(cert_store, _CERT_FIND_SUBJECT_STR_W, store_cn)
 
             # Prepare structures
             index = wintypes.DWORD()
@@ -242,10 +323,24 @@ if sys.platform == "win32":
         return cert_store
 
 
-    def _extract_certificate(cert_store):
+    def _open_store(location, store):
+        """Open a system certificate store."""
+        if location == CertificateStoreLocation.CURRENT_USER:
+            cert_location = _CERT_SYSTEM_STORE_CURRENT_USER
+        elif location == CertificateStoreLocation.LOCAL_MACHINE:
+            cert_location = _CERT_SYSTEM_STORE_LOCAL_MACHINE
+        else:
+            raise ValueError(f"Unknown local store location '{location}'")
+        cert_store = _cert_open_store(_CERT_STORE_PROV_SYSTEM_W, 0, 0, cert_location, store)
+        if cert_store is None:
+            raise Exception(f"Could not open system store (0x{ctypes.GetLastError():08x})")
+        return cert_store
+
+
+    def _extract_certificate(cert_store, find_mode, find_param):
         """Extract the cert from the new cert store."""
         cert_context = _cert_find_cert_in_store(cert_store, _X509_ASN_ENCODING | _PKCS_7_ASN_ENCODING, 0,
-                                                _CERT_FIND_ANY, None, None)
+                                                find_mode, find_param, None)
         if cert_context is None:
             raise Exception(f"Could not get certificate from store (0x{ctypes.GetLastError():08x})")
         key_spec = wintypes.DWORD()
@@ -258,7 +353,7 @@ if sys.platform == "win32":
                 found_private_key = True
             else:
                 cert_context = _cert_find_cert_in_store(cert_store, _X509_ASN_ENCODING | _PKCS_7_ASN_ENCODING, 0,
-                                                        _CERT_FIND_ANY, None, cert_context)
+                                                        find_mode, find_param, cert_context)
                 if cert_context is None:
                     raise Exception(f"Could not get certificate from store (0x{ctypes.GetLastError():08x})")
         return cert_context
