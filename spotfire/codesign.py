@@ -242,6 +242,7 @@ if sys.platform == "win32":
 
 
     class CertificateStoreLocation(enum.IntEnum):
+        """An enumeration to declare the location of the certificate store."""
         CURRENT_USER = 1
         LOCAL_MACHINE = 2
 
@@ -267,6 +268,7 @@ if sys.platform == "win32":
         :param use_sha256: whether or not to use SHA-256 as the timestamping hash function.  If ``True``, use SHA-256.
           If ``False``, use SHA-1.
         """
+        # pylint: disable=too-many-arguments
         try:
             # Sanity check arguments
             if not os.path.isfile(filename):

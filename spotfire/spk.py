@@ -766,6 +766,7 @@ def python(args, hook=None) -> None:
              ])
 def packages(args) -> None:
     """Package a list of Python packages as an SPK package"""
+    # pylint: disable=too-many-statements
 
     def cleanup():
         """Dummy cleanup function."""
