@@ -15,6 +15,7 @@ IF UNAME_SYSNAME == "Windows":
 
     import os
 
+    from libc cimport stdlib
     from vendor cimport windows
     from vendor.windows cimport wincrypt, mssign32
 
@@ -30,12 +31,12 @@ IF UNAME_SYSNAME == "Windows":
             return f"[WinError {self.winerror:08x}] {super().__str__()}"
 
     # An empty string.  Sometimes no passwords are encoded this way, sometimes as NULL.
-    cdef Py_UNICODE _empty_wstring[1]
+    cdef windows.WCHAR _empty_wstring[1]
     _empty_wstring[:] = [0]
 
     cpdef void codesign_file(filename,
                              certificate,
-                             windows.LPCWSTR password,
+                             password,
                              timestamp = None,
                              bint use_rfc3161 = False,
                              bint use_sha256 = False) except *:
@@ -53,6 +54,7 @@ IF UNAME_SYSNAME == "Windows":
         """
         cdef wincrypt.CRYPT_DATA_BLOB cert_blob
         cdef windows.HANDLE cert_store = NULL
+        cdef windows.LPCWSTR password_wstr = NULL
         cdef windows.LPCWSTR timestamp_wstr = NULL
 
         try:
@@ -65,7 +67,8 @@ IF UNAME_SYSNAME == "Windows":
                 cert_data = cert.read()
             cert_blob.cbData = <windows.DWORD>len(cert_data)
             cert_blob.pbData = <char*>cert_data
-            cert_store = wincrypt.PFXImportCertStore(&cert_blob, password, 0)
+            password_wstr = _object_to_wstr(password)
+            cert_store = wincrypt.PFXImportCertStore(&cert_blob, password_wstr, 0)
             if cert_store is NULL:
                 cert_store = wincrypt.PFXImportCertStore(&cert_blob, _empty_wstring, 0)
             if cert_store is NULL:
@@ -75,20 +78,23 @@ IF UNAME_SYSNAME == "Windows":
 
             # Handle optional values
             if timestamp is not None:
-                timestamp_pystr = str(timestamp)
-                timestamp_wstr = timestamp_pystr
+                timestamp_wstr = _object_to_wstr(timestamp)
 
             # Call the common signing code
             _codesign_file_core(filename, cert_store, wincrypt.CERT_FIND_ANY, NULL, timestamp_wstr,
                                 use_rfc3161, use_sha256)
         finally:
+            if password_wstr is not NULL:
+                stdlib.free(<void*>password_wstr)
+            if timestamp_wstr is not NULL:
+                stdlib.free(<void*>timestamp_wstr)
             if cert_store is not NULL:
                 wincrypt.CertCloseStore(cert_store, wincrypt.CERT_CLOSE_STORE_CHECK_FLAG)
 
     cpdef void codesign_file_from_store(filename,
                                         CertificateStoreLocation store_location,
-                                        windows.LPCWSTR store_name,
-                                        windows.LPCWSTR store_cn,
+                                        store_name,
+                                        store_cn,
                                         timestamp = None,
                                         bint use_rfc3161 = False,
                                         bint use_sha256 = False) except *:
@@ -108,14 +114,18 @@ IF UNAME_SYSNAME == "Windows":
         """
         cdef windows.HANDLE cert_store = NULL
         cdef windows.DWORD cert_location
+        cdef windows.LPCWSTR store_name_wstr = NULL
+        cdef windows.LPCWSTR store_cn_wstr = NULL
         cdef windows.LPCWSTR timestamp_wstr = NULL
 
         try:
             # Sanity check arguments
             if store_name is None or len(store_name) == 0:
                 raise ValueError("System certificate store name is empty")
+            store_name_wstr = _object_to_wstr(store_name)
             if store_cn is None or len(store_cn) == 0:
                 raise ValueError("System store certificate common name is empty")
+            store_cn_wstr = _object_to_wstr(store_cn)
 
             # Open the system store
             if store_location == CertificateStoreLocation.CURRENT_USER:
@@ -124,21 +134,43 @@ IF UNAME_SYSNAME == "Windows":
                 cert_location = wincrypt.CERT_SYSTEM_STORE_LOCAL_MACHINE
             else:
                 raise ValueError(f"Unknown local store location '{store_location}'")
-            cert_store = wincrypt.CertOpenStore(wincrypt.CERT_STORE_PROV_SYSTEM_W, 0, 0, cert_location, store_name)
+            cert_store = wincrypt.CertOpenStore(wincrypt.CERT_STORE_PROV_SYSTEM_W, 0, 0, cert_location, store_name_wstr)
             if cert_store is NULL:
                 raise CodesignError("Could not open system store")
 
             # Handle optional values
             if timestamp is not None:
-                timestamp_pystr = str(timestamp)
-                timestamp_wstr = timestamp_pystr
+                timestamp_wstr = _object_to_wstr(timestamp)
 
             # Call the common signing code
-            _codesign_file_core(filename, cert_store, wincrypt.CERT_FIND_SUBJECT_STR_W, store_cn, timestamp_wstr,
+            _codesign_file_core(filename, cert_store, wincrypt.CERT_FIND_SUBJECT_STR_W, store_cn_wstr, timestamp_wstr,
                                 use_rfc3161, use_sha256)
         finally:
+            if store_name_wstr is not NULL:
+                stdlib.free(<void*>store_name_wstr)
+            if store_cn_wstr is not NULL:
+                stdlib.free(<void*>store_cn_wstr)
+            if timestamp_wstr is not NULL:
+                stdlib.free(<void*>timestamp_wstr)
             if cert_store is not NULL:
                 wincrypt.CertCloseStore(cert_store, wincrypt.CERT_CLOSE_STORE_CHECK_FLAG)
+
+    cdef windows.LPCWSTR _object_to_wstr(object obj):
+        """Convert a Python object into a Windows wide string.
+        
+        :param obj: Python object to convert
+        :return: wide string buffer containing the converted string.  The caller is responsible for cleaning up this 
+        buffer using the native ``free`` function (from the Cython ``libc.stdlib`` module).
+        """
+        cdef int len_
+        cdef windows.LPCWSTR wstr = NULL
+
+        obj_bytes = str(obj).encode("utf-8")
+        len_ = windows.MultiByteToWideChar(windows.CP_UTF8, 0, obj_bytes, <int>len(obj_bytes), NULL, 0)
+        wstr = <windows.LPCWSTR>stdlib.calloc(len_, sizeof(windows.WCHAR))
+        windows.MultiByteToWideChar(windows.CP_UTF8, 0, obj_bytes, <int>len(obj_bytes), <windows.LPWSTR>wstr, len_)
+
+        return wstr
 
     cdef void _codesign_file_core(filename,
                                   windows.HANDLE cert_store,
@@ -210,7 +242,7 @@ IF UNAME_SYSNAME == "Windows":
 
             # Prepare structures
             signer_file_info.cbSize = sizeof(mssign32.SIGNER_FILE_INFO)
-            signer_file_info.pwszFileName = filename
+            signer_file_info.pwszFileName = _object_to_wstr(filename)
             signer_file_info.hFile = NULL
 
             signer_subject_info.cbSize = sizeof(mssign32.SIGNER_SUBJECT_INFO)
@@ -264,6 +296,8 @@ IF UNAME_SYSNAME == "Windows":
                 if result is not windows.S_OK:
                     raise CodesignError(f"Could not timestamp file {filename}")
         finally:
+            if signer_file_info.pwszFileName is not NULL:
+                stdlib.free(<void*>signer_file_info.pwszFileName)
             if cert_context is not NULL:
                 wincrypt.CertFreeCertificateContext(cert_context)
             if mssign32_library is not NULL:
