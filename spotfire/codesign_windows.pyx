@@ -37,7 +37,7 @@ cpdef void codesign_file(filename,
                          password,
                          timestamp = None,
                          bint use_rfc3161 = False,
-                         bint use_sha256 = False) except *:
+                         bint use_sha256 = False):
     """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a PFX file
     or PKCS#12 container.
 
@@ -95,7 +95,7 @@ cpdef void codesign_file_from_store(filename,
                                     store_cn,
                                     timestamp = None,
                                     bint use_rfc3161 = False,
-                                    bint use_sha256 = False) except *:
+                                    bint use_sha256 = False):
     """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a system
     certificate store.
 
@@ -176,7 +176,7 @@ cdef void _codesign_file_core(filename,
                               windows.LPCWSTR cert_find_param,
                               windows.LPCWSTR timestamp,
                               bint use_rfc3161,
-                              bint use_sha256) except *:
+                              bint use_sha256):
     cdef windows.HANDLE mssign32_library = NULL
     cdef mssign32.SignerSignExType signer_sign_ex_fun
     cdef mssign32.SignerTimeStampType signer_time_stamp_fun

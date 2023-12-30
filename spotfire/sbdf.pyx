@@ -142,7 +142,7 @@ cdef object _decimal_from_bytes(_SbdfDecimal* value):
     return decimal.Decimal((sign, tuple(digits), exponent))
 
 
-cdef _SbdfDecimal _decimal_to_bytes(dec: decimal.Decimal) except *:
+cdef _SbdfDecimal _decimal_to_bytes(dec: decimal.Decimal):
     """Convert a Python ``Decimal`` object to a 16-byte SBDF decimal value.
     
     :param dec: Decimal object
@@ -1254,7 +1254,7 @@ cdef np_c.ndarray _export_infer_invalids(values):
 
 
 ## Individual functions for exporting each Spotfire value type.
-ctypedef int(*exporter_fn)(_ExportContext, Py_ssize_t, Py_ssize_t, sbdf_c.sbdf_object**) except *
+ctypedef int(*exporter_fn)(_ExportContext, Py_ssize_t, Py_ssize_t, sbdf_c.sbdf_object**)
 
 
 cdef exporter_fn _export_get_exporter(int valuetype_id):
@@ -1289,7 +1289,7 @@ cdef exporter_fn _export_get_exporter(int valuetype_id):
         return _export_vt_decimal
 
 
-cdef int _export_vt_bool(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_bool(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of boolean values."""
     cdef np_c.ndarray values
     dtype = context.values_array.dtype
@@ -1301,7 +1301,7 @@ cdef int _export_vt_bool(_ExportContext context, Py_ssize_t start, Py_ssize_t co
                                       NULL, obj)
 
 
-cdef int _export_vt_int(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_int(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of integer values."""
     cdef np_c.ndarray values
     dtype = context.values_array.dtype
@@ -1315,7 +1315,7 @@ cdef int _export_vt_int(_ExportContext context, Py_ssize_t start, Py_ssize_t cou
                                       NULL, obj)
 
 
-cdef int _export_vt_long(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_long(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of long integer values."""
     cdef np_c.ndarray values
     dtype = context.values_array.dtype
@@ -1329,7 +1329,7 @@ cdef int _export_vt_long(_ExportContext context, Py_ssize_t start, Py_ssize_t co
                                       NULL, obj)
 
 
-cdef int _export_vt_float(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_float(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of float values."""
     cdef np_c.ndarray values
     dtype = context.values_array.dtype
@@ -1343,7 +1343,7 @@ cdef int _export_vt_float(_ExportContext context, Py_ssize_t start, Py_ssize_t c
                                       NULL, obj)
 
 
-cdef int _export_vt_double(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_double(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of double values."""
     cdef np_c.ndarray values
     dtype = context.values_array.dtype
@@ -1357,7 +1357,7 @@ cdef int _export_vt_double(_ExportContext context, Py_ssize_t start, Py_ssize_t 
                                       NULL, obj)
 
 
-cdef int _export_vt_datetime(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_datetime(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of datetime values."""
     cdef np_c.npy_intp shape[1]
     shape[0] = <np_c.npy_intp>count
@@ -1382,7 +1382,7 @@ cdef int _export_vt_datetime(_ExportContext context, Py_ssize_t start, Py_ssize_
     return sbdf_c.sbdf_obj_create_arr(sbdf_c.sbdf_vt_datetime(), <int>count, np_c.PyArray_DATA(new_values), NULL, obj)
 
 
-cdef int _export_vt_date(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_date(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of date values."""
     cdef np_c.npy_intp shape[1]
     shape[0] = <np_c.npy_intp> count
@@ -1401,7 +1401,7 @@ cdef int _export_vt_date(_ExportContext context, Py_ssize_t start, Py_ssize_t co
     return sbdf_c.sbdf_obj_create_arr(sbdf_c.sbdf_vt_date(), <int>count, np_c.PyArray_DATA(new_values), NULL, obj)
 
 
-cdef int _export_vt_time(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_time(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of time values."""
     cdef np_c.npy_intp shape[1]
     shape[0] = <np_c.npy_intp> count
@@ -1418,7 +1418,7 @@ cdef int _export_vt_time(_ExportContext context, Py_ssize_t start, Py_ssize_t co
     return sbdf_c.sbdf_obj_create_arr(sbdf_c.sbdf_vt_time(), <int>count, np_c.PyArray_DATA(new_values), NULL, obj)
 
 
-cdef int _export_vt_timespan(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_timespan(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of timespan values."""
     cdef np_c.npy_intp shape[1]
     shape[0] = <np_c.npy_intp>count
@@ -1439,19 +1439,19 @@ cdef int _export_vt_timespan(_ExportContext context, Py_ssize_t start, Py_ssize_
     return sbdf_c.sbdf_obj_create_arr(sbdf_c.sbdf_vt_timespan(), <int>count, np_c.PyArray_DATA(new_values), NULL, obj)
 
 
-cdef int _export_vt_string(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_string(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of string values."""
     obj[0] = _export_extract_string_obj(context.values_array, context.invalid_array, start, count)
     return sbdf_c.SBDF_OK
 
 
-cdef int _export_vt_binary(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_binary(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of binary values."""
     obj[0] = _export_extract_binary_obj(context.values_array, context.invalid_array, start, count)
     return sbdf_c.SBDF_OK
 
 
-cdef int _export_vt_decimal(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj) except *:
+cdef int _export_vt_decimal(_ExportContext context, Py_ssize_t start, Py_ssize_t count, sbdf_c.sbdf_object** obj):
     """Export a slice of data consisting of decimal values."""
     cdef unsigned char* buf = <unsigned char*>mem.PyMem_RawMalloc(count * sizeof(_SbdfDecimal))
     cdef int i
@@ -1486,7 +1486,7 @@ cdef bint _export_infer_int_promotion(values, values_description):
     return False
 
 
-cdef int _export_infer_valuetype_from_type(values, values_description) except *:
+cdef int _export_infer_valuetype_from_type(values, values_description):
     """Determine a value type for a data set based on the Python type of the objects in the values list.
     
     :param values: the values to infer the value type of
@@ -1550,7 +1550,7 @@ cdef int _export_infer_valuetype_from_type(values, values_description) except *:
         raise SBDFError(f"unknown type '{_utils.type_name(vals_type)}' in {values_description}")
 
 
-cdef int _export_infer_valuetype_from_pandas_dtype(series, series_description) except *:
+cdef int _export_infer_valuetype_from_pandas_dtype(series, series_description):
     """Determine a value type for a data set based on the Pandas dtype for the series.
     
     :param series: the values to infer the value type of
@@ -1598,7 +1598,7 @@ cdef object _VT_CONVERSIONS_NUMERIC = [sbdf_c.SBDF_BOOLTYPEID, sbdf_c.SBDF_INTTY
                                        sbdf_c.SBDF_FLOATTYPEID, sbdf_c.SBDF_DOUBLETYPEID]
 
 
-cdef int _export_infer_valuetype_from_spotfire_typename(series, series_description) except *:
+cdef int _export_infer_valuetype_from_spotfire_typename(series, series_description):
     """Determine a value type for a data set based on the name of the Spotfire type.
     
     :param series: the values to infer the value type of
@@ -1697,7 +1697,7 @@ cdef inline void* _export_get_offset_ptr(np_c.ndarray array, Py_ssize_t start, P
     return np_c.PyArray_DATA(sliced)
 
 
-cdef sbdf_c.sbdf_metadata_head* _export_metadata(dict md, int column_num) except *:
+cdef sbdf_c.sbdf_metadata_head* _export_metadata(dict md, int column_num):
     """Process a Python metadata representation into its SBDF API equivalent
     
     :param md: dictionary containing table or column metadata
