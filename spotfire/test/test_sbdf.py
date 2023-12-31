@@ -427,13 +427,13 @@ class SbdfTest(unittest.TestCase):
             'utc':   [now_utc],
             'local': [now_local]
         })
-        now_roundtrip = now.replace(microsecond=now.microsecond // 1000 * 1000)  # SBDF has millisecond resolution
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
             df2 = sbdf.import_data(f"{tempdir}/output.sbdf")
             for col in df2.columns:
                 val = df2.at[0, col]
-                self.assertEqual(val, now_roundtrip, f"df2[{col}] = {repr(val)}")
+                self.assertAlmostEqual(val, now, msg=f"df2[{col}] = {repr(val)}",
+                                       delta=datetime.timedelta(milliseconds=1)) # SBDF has millisecond resolution
 
     def test_image_matplot(self):
         """Verify Matplotlib figures export properly"""
