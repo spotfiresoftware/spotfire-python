@@ -12,7 +12,9 @@ import HtmlTestRunner
 
 from spotfire.test import utils
 
-TEST_MODULES = ['spotfire.test.test_sbdf', 'spotfire.test.test_data_function']
+TEST_MODULES = ['spotfire.test.test_cabfile',
+                'spotfire.test.test_data_function',
+                'spotfire.test.test_sbdf']
 
 
 # noinspection PyUnusedLocal
