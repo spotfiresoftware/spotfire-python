@@ -112,7 +112,7 @@ setup(
     cmdclass={'build_ext': BuildExt, 'build_ext_debug': BuildExtDebug},
     include_package_data=True,
     install_requires=project_requirements,
-    python_requires='>=3.7',
+    python_requires='>=3.8',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
