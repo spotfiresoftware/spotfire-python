@@ -131,7 +131,8 @@ jobs:
         id: version
         run: |
           echo -n "python-version="  >> $GITHUB_OUTPUT
-          echo '${{ needs.build-sdist.outputs.python-versions }}' | sed -e 's/[^"]*"//' -e 's/".*//' >> $GITHUB_OUTPUT
+#         echo '${{ needs.build-sdist.outputs.python-versions }}' | sed -e 's/[^"]*"//' -e 's/".*//' >> $GITHUB_OUTPUT
+          echo 3.11 >> $GITHUB_OUTPUT  # XXX Frozen version of pylint does not work with 3.12. (See comment on #38 for more info.)
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
