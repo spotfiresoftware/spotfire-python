@@ -3,9 +3,9 @@
 # in the license file that is distributed with this file.
 
 # pylint: skip-file
+import logging
 import sys
 
-from distutils import log
 from setuptools import setup, find_packages
 from Cython.Distutils import Extension, build_ext
 import numpy as np
@@ -20,23 +20,15 @@ def get_requires(filename):
     return requirements
 
 
-class BuildExt(build_ext):
-    def finalize_options(self):
-        super().finalize_options()
-        if self.build_temp:
-            for m in self.distribution.ext_modules:
-                m.include_dirs.extend([f"{self.build_temp}/pyrex/spotfire"])
-
-
-class BuildExtDebug(BuildExt):
+class BuildExtDebug(build_ext):
     def finalize_options(self):
         if sys.platform == "win32":
-            log.info("appending debug flags for Windows")
+            logging.info("appending debug flags for Windows")
             for m in self.distribution.ext_modules:
                 m.extra_compile_args.extend(["-Ox", "-Zi"])
                 m.extra_link_args.extend(["-debug:full"])
         else:
-            log.info("enabling cygdb for Unix")
+            logging.info("enabling cygdb for Unix")
             super().cython_gdb = True
         super().finalize_options()
 
@@ -109,7 +101,7 @@ setup(
     license='BSD 3-Clause License',
     packages=find_packages(exclude=['spotfire.test.files']),
     ext_modules=extensions,
-    cmdclass={'build_ext': BuildExt, 'build_ext_debug': BuildExtDebug},
+    cmdclass={'build_ext_debug': BuildExtDebug},
     include_package_data=True,
     install_requires=project_requirements,
     python_requires='>=3.8',
