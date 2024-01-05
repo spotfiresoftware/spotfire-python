@@ -373,6 +373,23 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 if not filename_relative.startswith(f"bin{os.path.sep}"):
                     self.add(filename_ondisk, filename_payload)
 
+        # Always install the requirements and constraints files at the top level of the package; it's just that the
+        # top level depends on whether we're building a server SPK (which will have a "root" directory) or an analyst
+        # SPK (which will not)
+        if prefix.startswith("root/"):
+            additional_loc = "root/"
+        else:
+            additional_loc = ""
+
+        # Add the requirements file to the package (only if building a packages SPK,
+        # which will ask to use the deny list)
+        if use_deny_list:
+            self.add(requirements, f"{additional_loc}requirements-{self.name}.txt")
+
+        # Add the constraints file to the package
+        if constraint:
+            self.add(constraint, f"{additional_loc}constraints-{self.name}.txt")
+
         return package_versions
 
     def remove_included_packages(self, tempdir: str, package_versions: typing.Dict[str, str]) -> typing.Dict[str, str]:
