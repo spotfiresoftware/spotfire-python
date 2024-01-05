@@ -7,6 +7,9 @@
 import abc
 import argparse
 import datetime
+import fileinput
+import glob
+from importlib import metadata as imp_md, resources as imp_res
 import io
 import json
 import locale
@@ -23,8 +26,7 @@ import uuid
 from xml.etree import ElementTree
 import zipfile
 
-from pip._vendor.packaging import version as pip_version
-import pkg_resources
+from packaging import requirements as pkg_req, utils as pkg_utils, version as pkg_version
 
 import spotfire
 import spotfire.version
@@ -344,9 +346,19 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         package_versions_json = json.loads(pip_list.stdout.decode(locale.getpreferredencoding()))
         package_versions = {x['name']: x['version'] for x in package_versions_json}
 
+        # Update RECORD files in tempdir to remove references to '../../'
+        record_files = glob.glob(os.path.join(tempdir, "*.dist-info/RECORD"))
+        with fileinput.input(record_files, encoding="utf-8", inplace=True) as record_input:
+            for line in record_input:
+                line = line.rstrip()
+                if line.startswith("../../"):
+                    print(line[6:])
+                else:
+                    print(line)
+
         # Delete duplicate packages if needed
         if use_deny_list:
-            package_versions = self.scan_duplicate_packages(tempdir, package_versions)
+            package_versions = self.remove_included_packages(tempdir, package_versions)
 
         # Scan all files in tempdir
         _message("Scanning package files from temporary location.")
@@ -363,9 +375,9 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
 
         return package_versions
 
-    @staticmethod
-    def scan_duplicate_packages(tempdir: str, package_versions: typing.Dict[str, str]) -> typing.Dict[str, str]:
-        """Find and delete duplicate packages from a directory of packages .
+    def remove_included_packages(self, tempdir: str, package_versions: typing.Dict[str, str]) -> typing.Dict[str, str]:
+        """Find and delete packages that would be included with an interpreter Spotfire package from a directory of
+        packages.
 
         :param tempdir: the temporary on-disk directory to which the packages to scan for duplicates have been
                           downloaded
@@ -373,70 +385,86 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                                    to versions
         :return: `package_versions`, but with duplicate packages removed from the mapping
         """
-        # pylint: disable=too-many-nested-blocks,too-many-locals
         # Use the spotfire requirements file as a deny list.
-        if "spotfire.zip" in spotfire.__path__[0]:
-            # Handle getting the requirements.txt from a zip file.
-            with zipfile.ZipFile(os.path.split(spotfire.__path__[0])[0]) as zfile:
-                with zfile.open("spotfire/requirements.txt") as deny_file:
-                    deny_requirements = deny_file.readlines()
-                deny_list = [line.decode("utf-8").rstrip('\n') for line in deny_requirements]
-        else:
-            # Handle getting the requirements.txt directly from the file system.
-            with open(os.path.join(spotfire.__path__[0], "requirements.txt"), encoding="utf8") as deny_file:
-                deny_requirements = deny_file.readlines()
-            deny_list = [line.rstrip('\n') for line in deny_requirements]
+        with imp_res.files("spotfire").joinpath("requirements.txt").open("r", encoding="utf-8") as deny_file:
+            deny_requirements = deny_file.read()
+            deny_list = self.requirements_from(deny_requirements)
 
-        # Compile a Set of directories to delete
-        package_directories = set()
-        # Go through each package
-        for package_name in deny_list:
-            # Remove version numbers from package name and keep a copy of the original name
-            package_req = pkg_resources.Requirement.parse(package_name)
-            original_package_name = package_req.project_name
-            # Convert dash to underscore for file access
-            package_name = package_req.project_name.replace('-', '_')
-            # Walk through each directory
-            for root, directory_names, _ in os.walk(tempdir):
-                for directory_name in directory_names:
-                    # look for the `dist-info` directory for each package
-                    if re.search(rf'^{package_name}-.*\.dist-info$', directory_name):
-                        package_directories.add(directory_name)
-                        # Go through the RECORD file from the package dist-info and delete each listed file
-                        record_file = os.path.join(root, directory_name, 'RECORD')
-                        if os.path.isfile(record_file):
-                            with open(record_file, encoding="utf8") as open_record_file:
-                                record_files = open_record_file.readlines()
-                            for file in record_files:
-                                # Clean up the path to each file.
-                                # RECORD has file name, then comma followed by info we don't need.
-                                file = file.split(',', 1)[0]
-                                # Files in "/bin" start with "../../" but we don't need that.
-                                if file.startswith('../../'):
-                                    file = file.split('../../', 1)[1]
-                                # Get the path to the file
-                                file = os.path.join(root, file)
-                                # Delete the file if it exists
-                                if os.path.isfile(file):
-                                    os.remove(file)
-                                else:
-                                    _message(f"Could not find RECORD file {file}")
-                            _message(f"Deleted files listed in RECORD for {directory_name}")
-                            package_versions.pop(original_package_name, None)
-                    if directory_name == package_name:
-                        package_directories.add(directory_name)
-        # Manually add 'dateutil's non-standard package name
-        package_directories.add('dateutil')
-        # Delete the packages' directories
-        for package_directory in package_directories:
-            package_directory_file = os.path.join(tempdir, package_directory)
-            if os.path.isdir(package_directory_file):
-                try:
-                    shutil.rmtree(package_directory_file)
-                except OSError:
-                    _message(f"Unable to remove directory {package_directory_file}")
+        # Find all distributions in the temp directory
+        dist_info_dirs = glob.glob(os.path.join(tempdir, "*.dist-info"))
+        dist_infos = [imp_md.Distribution.at(x) for x in dist_info_dirs]
+
+        # Clean any distributions on our deny list
+        for dist in dist_infos:
+            if dist.name in deny_list:
+                dist_name = dist.name
+                self._remove_package_files(tempdir, dist)
+                del package_versions[dist_name]
+
         _message("Completed removing files and directories for packages on the deny list.")
         return package_versions
+
+    def _process_package_requirements(self, requirement, extra: str = None, seen: typing.Set[str] = None) -> None:
+        """Process the child requirements of a requirement object."""
+        # Do not process if the requested extra is not part of the current requirement.
+        if requirement.marker and not requirement.marker.evaluate({"extra": extra}):
+            return
+
+        # Record the package name in the seen set.
+        if seen is None:
+            seen = set()
+        seen.add(requirement.name)
+
+        # Get the child requirements of the current requirement.
+        try:
+            requires = imp_md.requires(requirement.name)
+        except imp_md.PackageNotFoundError:
+            requires = None
+
+        # Now recurse if any child requirements exist.
+        if requires:
+            for req in requires:
+                child_req = pkg_req.Requirement(req)
+                if pkg_utils.canonicalize_name(child_req.name) not in seen:
+                    self._process_package_requirements(child_req, None, seen)
+                    for child_extra in child_req.extras:
+                        self._process_package_requirements(child_req, child_extra, seen)
+
+    def requirements_from(self, requirements: str) -> typing.Set[str]:
+        """Determine the requirements recursively of a requirements file.
+
+        :param requirements: the text contents of the requirements to recursively determine
+        :returns: set of package names that are recursively included by the requirements file
+        """
+        packages_seen = set()
+        for line in requirements.splitlines():
+            line = re.sub('#.*$', '', line)
+            line = line.strip()
+            if line:
+                req = pkg_req.Requirement(line)
+                self._process_package_requirements(req, None, packages_seen)
+        return packages_seen
+
+    def _remove_package_files(self, tempdir: str, dist: imp_md.Distribution) -> None:
+        """Remove all files in this distribution.  Note that after this method returns, the distribution object does
+        not contain any valid information since the backing metadata has been removed."""
+        to_delete = set()
+        for file in dist.files:
+            to_delete.add(str(file.locate()))
+
+        name = dist.name
+        version = dist.version
+        for file_loc in to_delete:
+            # Delete the file
+            os.remove(file_loc)
+
+            # Clean any empty directories created by the file deletion
+            file_dir = os.path.dirname(file_loc)
+            while file_dir != tempdir and len(os.listdir(file_dir)) == 0:
+                os.rmdir(file_dir)
+                file_dir = os.path.dirname(file_dir)
+
+        _message(f"Deleted files listed in RECORD for {name}-{version}.dist-info")
 
     def scan_path_configuration_file(self, prefix: str) -> None:
         """Add a path configuration file for the 'spotfire-packages' directory to the Python interpreter.
@@ -951,8 +979,8 @@ def _should_increment_major(old_packages: typing.Dict[str, str], new_packages: t
         tick_major = True
     # Check for package downgrades
     for pkg in old_packages.keys() & new_packages.keys():
-        previous_version = pip_version.parse(old_packages[pkg])
-        new_version = pip_version.parse(new_packages[pkg])
+        previous_version = pkg_version.parse(old_packages[pkg])
+        new_version = pkg_version.parse(new_packages[pkg])
         if previous_version > new_version:
             tick_major = True
             _error(f"Package '{pkg}' has a lower version than previously built.")

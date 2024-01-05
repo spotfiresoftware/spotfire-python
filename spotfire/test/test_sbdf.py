@@ -4,7 +4,6 @@ import datetime
 import decimal
 import unittest
 import tempfile
-import pkg_resources
 
 import pandas
 import pandas.testing
@@ -12,6 +11,7 @@ import geopandas
 import matplotlib.pyplot
 import seaborn
 import PIL.Image
+from packaging import version
 
 import spotfire
 from spotfire import sbdf
@@ -128,7 +128,7 @@ class SbdfTest(unittest.TestCase):
         self.assertIsInstance(gdf, geopandas.GeoDataFrame)
 
         # GeoPandas >= 0.7.0
-        if pkg_resources.parse_version(geopandas.__version__) >= pkg_resources.parse_version("0.7.0"):
+        if version.Version(geopandas.__version__) >= version.Version("0.7.0"):
             self.assertEqual(gdf.crs.to_epsg(), 4326)
             self.assertEqual(gdf.crs.to_string(), "EPSG:4326")
             with tempfile.TemporaryDirectory() as tempdir:
