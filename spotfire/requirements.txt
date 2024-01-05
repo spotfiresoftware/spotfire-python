@@ -6,3 +6,4 @@ pytz
 setuptools
 six
 wheel
+packaging
