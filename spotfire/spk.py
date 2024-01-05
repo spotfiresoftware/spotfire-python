@@ -317,7 +317,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :return: a dict that maps the names of pip packages that were scanned into the SPK package to their
                    installed versions
         """
-        # pylint: disable=too-many-locals
+        # pylint: disable=too-many-locals,too-many-branches
 
         tempdir = tempfile.mkdtemp(prefix="spk")
         self.last_scan_dir = tempdir
@@ -520,7 +520,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             "SchemaVersion": "2.0",
             "Name": self.name,
             "Version": str(self.version),
-            "LastModified": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.0000000Z"),
+            "LastModified": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.0000000Z"),
             "SeriesId": self.id,
             "InstanceId": str(uuid.uuid4()),
             "CabinetName": self._payload_name(),
@@ -636,8 +636,8 @@ class _ZipPackageBuilder(_PackageBuilder):
                     mode = stat.st_mode & 0o7777
                     ElementTree.SubElement(metadata_files, "File", {
                         "TargetRelativePath": filename_payload,
-                        "LastModifiedDate": datetime.datetime.utcfromtimestamp(stat.st_ctime).strftime(
-                            "%Y-%m-%dT%H:%M:%SZ"),
+                        "LastModifiedDate": (datetime.datetime.fromtimestamp(stat.st_ctime, datetime.timezone.utc)
+                                             .strftime("%Y-%m-%dT%H:%M:%SZ")),
                     })
                     if platform.system() != "Windows" and mode != 0o644:
                         payload_script += f"chmod {mode:o} {filename_payload_fwdslash}\n"
@@ -648,7 +648,7 @@ class _ZipPackageBuilder(_PackageBuilder):
                 payload.writestr(f"root/Tools/Update/{self.chmod_script_name}.sh", "".join(payload_script))
                 ElementTree.SubElement(metadata_files, "File", {
                     "TargetRelativePath": f"root\\Tools\\Update\\{self.chmod_script_name}.sh",
-                    "LastModifiedDate": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "LastModifiedDate": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 })
 
             # Add the module.xml file
@@ -713,8 +713,8 @@ class _CabPackageBuilder(_PackageBuilder):
                 stat = os.lstat(filename_ondisk)
                 ElementTree.SubElement(metadata_files, "File", {
                     "TargetRelativePath": filename_payload,
-                    "LastModifiedDate": datetime.datetime.utcfromtimestamp(stat.st_ctime).strftime(
-                        "%Y-%m-%dT%H:%M:%SZ"),
+                    "LastModifiedDate": (datetime.datetime.fromtimestamp(stat.st_ctime, datetime.timezone.utc)
+                                         .strftime("%Y-%m-%dT%H:%M:%SZ")),
                 })
 
             # Add the module.xml file
