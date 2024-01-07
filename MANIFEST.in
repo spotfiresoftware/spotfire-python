@@ -3,7 +3,7 @@ include *requirements_*.txt
 include spotfire/requirements.txt
 include spotfire/*.pyx
 include spotfire/*_helpers.*
-recursive-exclude spotfire/test *
+recursive-exclude spotfire/test/files *
 exclude setup.cfg
 recursive-include vendor *.pxd *.h *.c
 recursive-exclude vendor/sbdf-c/tests *.h *.c
