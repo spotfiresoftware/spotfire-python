@@ -14,8 +14,9 @@ jobs:
           python-version: '3.x'
       - name: Install Tools
         run: |
-          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > pyproj-requires.txt
-          pip install -r pyproj-requires.txt
+          mkdir dist
+          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > dist/pyproj-requires.txt
+          pip install -r dist/pyproj-requires.txt
       - name: Source Packaging
         run: |
           python setup.py sdist
@@ -57,29 +58,41 @@ jobs:
         operating-system: ['ubuntu-latest', 'windows-latest']
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
         with:
-          submodules: recursive
+          name: sdist
+          path: dist
       - name: Set Up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Build Requirements
         run: |
-          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > pyproj-requires.txt
-          pip install auditwheel -r pyproj-requires.txt
-      - name: Build Wheel
+          pip install auditwheel -r dist/pyproj-requires.txt
+      - name: Build Wheel (Linux)
+        if: matrix.operating-system == 'ubuntu-latest'
         run: |
+          # Unpack sdist
+          tar xzf dist/spotfire-*.tar.gz
+          cd spotfire-*
+          # Build wheel
           python setup.py bdist_wheel
-      - name: Convert Wheel to Manylinux
-        if: ${{ matrix.operating-system == 'ubuntu-latest' }}
+          # Convert wheel to manylinux
+          auditwheel repair -w ../dist --plat manylinux2014_x86_64 dist/*.whl
+      - name: Build Wheel (Windows)
+        if: matrix.operating-system == 'windows-latest'
         run: |
-          mv dist/*.whl .
-          auditwheel repair -w dist --plat manylinux2014_x86_64 ./*.whl
+          # Unpack sdist
+          tar xzf $((dir dist\spotfire-*.tar.gz).FullName)
+          cd spotfire-*
+          # Build wheel
+          python setup.py bdist_wheel
+          # Move wheel out of build dir into top-level dist dir 
+          mv dist\*.whl ..\dist
       - uses: actions/upload-artifact@v3
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
-          path: 'dist/**'
+          path: 'dist/*.whl'
   test:
     name: Test
     needs: [build-sdist, build-wheel]
