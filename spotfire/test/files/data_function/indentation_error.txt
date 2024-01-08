@@ -1,0 +1,10 @@
+Error executing Python script:
+
+  File "<data_function>", line 1
+         print('You have entered an even number.')
+         ^
+IndentationError: unexpected indent (<data_function>, line 1)
+
+Traceback (most recent call last):
+  File "data_function.py", in _compile_script
+    self.compiled_script = compile(self.script, '<data_function>', 'exec')

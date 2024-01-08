@@ -1,0 +1,4 @@
+
+Standard output:
+This code is really executed. (E)
+(and this too) (E2)

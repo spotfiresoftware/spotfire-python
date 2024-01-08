@@ -1,0 +1,9 @@
+Error executing Python script:
+
+spotfire.data_function.DataFunctionError: Output variable 'out1' was not defined
+
+Traceback (most recent call last):
+  File "data_function.py", line 255, in evaluate
+    self._write_outputs(result)
+  File "data_function.py", line 346, in _write_outputs
+    raise DataFunctionError(f"Output variable '{output.name}' was not defined")

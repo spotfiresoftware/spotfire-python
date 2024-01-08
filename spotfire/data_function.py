@@ -266,7 +266,7 @@ class AnalyticSpec:
             self.log.write("\n")
 
     def evaluate(self) -> AnalyticResult:
-        """Run the script in the in the analytic spec and process the results.
+        """Run the script in the analytic spec and process the results.
 
         :return: whether the data function was evaluated successfully, the text output of the data function or an error
         message describing why the data function failed, and the exception information and stack trace if the data

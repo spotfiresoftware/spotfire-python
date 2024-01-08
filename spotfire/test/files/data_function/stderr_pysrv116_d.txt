@@ -1,0 +1,3 @@
+
+Standard output:
+This code is really executed. (D)

@@ -1,0 +1,13 @@
+
+Standard error:
+<string>:4: Warning: This is a Warning
+<string>:5: UserWarning: This is a UserWarning
+<string>:6: DeprecationWarning: This is a DeprecationWarning
+<string>:7: SyntaxWarning: This is a SyntaxWarning
+<string>:8: RuntimeWarning: This is a RuntimeWarning
+<string>:9: FutureWarning: This is a FutureWarning
+<string>:10: PendingDeprecationWarning: This is a PendingDeprecationWarning
+<string>:11: ImportWarning: This is a ImportWarning
+<string>:12: UnicodeWarning: This is a UnicodeWarning
+<string>:13: BytesWarning: This is a BytesWarning
+<string>:14: ResourceWarning: This is a ResourceWarning

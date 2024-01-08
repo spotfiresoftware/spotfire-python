@@ -1,0 +1,13 @@
+
+Standard error:
+<data_function>:4: Warning: This is a Warning
+<data_function>:5: UserWarning: This is a UserWarning
+<data_function>:6: DeprecationWarning: This is a DeprecationWarning
+<data_function>:7: SyntaxWarning: This is a SyntaxWarning
+<data_function>:8: RuntimeWarning: This is a RuntimeWarning
+<data_function>:9: FutureWarning: This is a FutureWarning
+<data_function>:10: PendingDeprecationWarning: This is a PendingDeprecationWarning
+<data_function>:11: ImportWarning: This is a ImportWarning
+<data_function>:12: UnicodeWarning: This is a UnicodeWarning
+<data_function>:13: BytesWarning: This is a BytesWarning
+<data_function>:14: ResourceWarning: This is a ResourceWarning

@@ -1,0 +1,3 @@
+
+Standard error:
+<data_function>:3: UserWarning: Pandas doesn't allow columns to be created via a new attribute name - see https://pandas.pydata.org/pandas-docs/stable/indexing.html#attribute-access

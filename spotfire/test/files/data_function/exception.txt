@@ -1,0 +1,8 @@
+Error executing Python script:
+
+TypeError: from test_exception
+
+Traceback (most recent call last):
+  File "data_function.py", line 324, in _execute_script
+    exec(compiled_script, self.globals)
+  File "<data_function>", line 1, in <module>

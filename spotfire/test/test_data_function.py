@@ -11,6 +11,33 @@ import pandas as pd
 import pandas.testing as pdtest
 
 from spotfire import sbdf, data_function as datafn, _utils
+from spotfire.test import utils as testutils
+
+
+class _PythonVersionedExpectedValue:
+    """Represents a message whose contents can depend on the version of the Python interpreter that created it."""
+    def __init__(self, name):
+        # self._major = 0
+        # self._minor = 0
+        self._message = None
+        self._load_version(name)
+
+    def _load_version(self, name):
+        # Read in the all-versions expected output file
+        self._load_file(testutils.get_test_data_file(f"data_function/{name}.txt"))
+        # Now try to find a better version for our Python interpreter
+        for version in range(sys.version_info.minor, 7, -1):
+            filename = testutils.get_test_data_file(f"data_function/{name}-{sys.version_info.major}.{version}.txt")
+            if os.path.exists(filename):
+                self._load_file(filename)
+                return
+
+    def _load_file(self, filename):
+        with open(filename, encoding="utf-8") as file:
+            self._message = file.read()
+
+    def __call__(self, *args, **kwargs):
+        return self._message
 
 
 class DataFunctionTest(unittest.TestCase):
@@ -32,7 +59,10 @@ class DataFunctionTest(unittest.TestCase):
                     in_type = "table"
                 else:
                     try:
-                        in_type = "value" if len(inputs[k]) == 1 else "column"
+                        if len(inputs[k]) == 1:
+                            in_type = "value"
+                        else:
+                            in_type = "column"
                     except TypeError:
                         in_type = "value"
                 tmp = temp_files.new_file(suffix=".sbdf")
@@ -58,18 +88,21 @@ class DataFunctionTest(unittest.TestCase):
             actual_result._debug_log = None
             actual_result_str = actual_result.summary
             if actual_result_str:
-                print("test: --- start actual result ---")
+                print("test: --- start actual output ---")
                 print(actual_result_str)
-                print("test: --- end actual result ---")
+                print("test: --- end actual output ---")
             if callable(expected_result):
                 expected = expected_result()
             else:
                 expected = expected_result
             if expected:
-                print("test: --- start expected result ---")
+                print("test: --- start expected output ---")
                 print(expected)
-                print("test: --- end expected result ---")
-            self.assertEqual(self._process_log_message(expected), self._process_log_message(actual_result_str))
+                print("test: --- end expected output ---")
+                self.assertEqual(self._process_log_message(expected), self._process_log_message(actual_result_str))
+            else:
+                print("test: no expected output")
+                self.assertEqual(len(actual_result_str), 0)
             if not actual_result.success:
                 print("test: data function has failed")
             self.assertEqual(actual_result.success, success)
@@ -99,7 +132,8 @@ class DataFunctionTest(unittest.TestCase):
                 else:
                     print("test: file doesn't exist")
 
-    def _process_log_message(self, msg):
+    @staticmethod
+    def _process_log_message(msg):
         # Remove line numbers from exception tracebacks
         msg = re.sub(", line \\d+,", ",", msg)
         # Remove temporary file names
@@ -136,188 +170,47 @@ class DataFunctionTest(unittest.TestCase):
     def test_value_input(self):
         """Test a value input."""
         out1_df = pd.DataFrame({"out1": [55]}, dtype="Int64")
-        self._run_analytic("out1 = in1", {"in1": 55}, {"out1": out1_df}, True, "")
+        self._run_analytic("out1 = in1", {"in1": 55}, {"out1": out1_df}, True, None)
 
     def test_column_input(self):
         """Test a column input."""
         out1_df = pd.DataFrame({"in1": [1, 2, 3]}, dtype="Int64")
-        self._run_analytic("out1 = in1", {"in1": [1, 2, 3]}, {"out1": out1_df}, True, "")
+        self._run_analytic("out1 = in1", {"in1": [1, 2, 3]}, {"out1": out1_df}, True, None)
 
     def test_table_input(self):
         """Test a table input."""
         in1_df = pd.DataFrame({"x": pd.Series([22, 33], dtype="Int64"), "y": ["alpha", "bravo"]})
-        self._run_analytic("out1 = in1", {"in1": pd.DataFrame(data=in1_df)}, {"out1": in1_df}, True, "")
+        self._run_analytic("out1 = in1", {"in1": pd.DataFrame(data=in1_df)}, {"out1": in1_df}, True, None)
 
     def test_exception(self):
         """Test a data function that raises an exception."""
-        self._run_analytic("raise TypeError('from test_exception')", {}, {}, False, """Error executing Python script:
-
-TypeError: from test_exception
-
-Traceback (most recent call last):
-  File "data_function.py", line 324, in _execute_script
-    exec(compiled_script, self.globals)
-  File "<data_function>", line 1, in <module>
-""")
+        expected = _PythonVersionedExpectedValue("exception")
+        self._run_analytic("raise TypeError('from test_exception')", {}, {}, False, expected)
 
     def test_syntax_error(self):
         """Test a data function that has a syntax error."""
-        def expected():
-            # pylint: disable=no-else-return
-            if sys.version_info.major == 3 and sys.version_info.minor < 8:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    rais TypeError('from test_syntax_error')
-                 ^
-SyntaxError: invalid syntax (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-"""
-            elif sys.version_info.major == 3 and sys.version_info.minor < 11:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    rais TypeError('from test_syntax_error')
-         ^
-SyntaxError: invalid syntax (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-"""
-            else:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    rais TypeError('from test_syntax_error')
-         ^
-SyntaxError: invalid syntax (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-"""
-
+        expected = _PythonVersionedExpectedValue("syntax_error")
         self._run_analytic("rais TypeError('from test_syntax_error')", {}, {}, False, expected)
 
     def test_syntax_error_b(self):
         """Test a data function that has a syntax error."""
-        def expected():
-            # pylint: disable=no-else-return
-            if sys.version_info.major == 3 and sys.version_info.minor < 10:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    if + 42
-          ^
-SyntaxError: invalid syntax (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-"""
-            elif sys.version_info.major == 3 and sys.version_info.minor < 11:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    if + 42
-          ^
-SyntaxError: expected ':' (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-"""
-            else:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    if + 42
-          ^
-SyntaxError: expected ':' (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-"""
-
+        expected = _PythonVersionedExpectedValue("syntax_error_b")
         self._run_analytic("if + 42", {}, {}, False, expected)
 
     def test_syntax_error_c(self):
         """Run the syntax error test provided in pysrv122"""
-        def expected():
-            # pylint: disable=no-else-return
-            if sys.version_info.major == 3 and sys.version_info.minor < 11:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    whille x%2 == 0:
-           ^
-SyntaxError: invalid syntax (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-"""
-            else:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-    whille x%2 == 0:
-           ^
-SyntaxError: invalid syntax (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-"""
-
+        expected = _PythonVersionedExpectedValue("syntax_error_c")
         self._run_analytic("whille x%2 == 0:", {}, {}, False, expected)
 
     def test_indentation_error(self):
         """Run the syntax error test provided in pysrv122"""
-        def expected():
-            # pylint: disable=no-else-return
-            if sys.version_info.major == 3 and sys.version_info.minor < 11:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-         print('You have entered an even number.')
-         ^
-IndentationError: unexpected indent (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-"""
-            else:
-                return """Error executing Python script:
-
-  File "<data_function>", line 1
-         print('You have entered an even number.')
-         ^
-IndentationError: unexpected indent (<data_function>, line 1)
-
-Traceback (most recent call last):
-  File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-"""
-
+        expected = _PythonVersionedExpectedValue("indentation_error")
         self._run_analytic("     print('You have entered an even number.')", {}, {}, False, expected)
 
     def test_print(self):
         """Test a data function that prints."""
-        self._run_analytic("print(4*5)", {}, {}, True, """
-Standard output:
-20
-""")
+        expected = _PythonVersionedExpectedValue("print")
+        self._run_analytic("print(4*5)", {}, {}, True, expected)
 
     def test_simple_math(self):
         """Test doing some simple math on data frames."""
@@ -325,84 +218,39 @@ Standard output:
                                "y": [4.5, 5.6, 6.7, 7.8, 8.9, 9.10]})
         out1_df = pd.DataFrame({"x": pd.Series([3, 4, 5, 6, 7, 8], dtype="Int64"),
                                 "y": [7.5, 8.6, 9.7, 10.8, 11.9, 12.10]})
-        self._run_analytic("out1 = in1 + in2", {"in1": in1_df, "in2": 3}, {"out1": out1_df}, True, "")
+        self._run_analytic("out1 = in1 + in2", {"in1": in1_df, "in2": 3}, {"out1": out1_df}, True, None)
 
     def test_no_inputs(self):
         """Test a data function that has no inputs."""
         out1_df = pd.DataFrame({"out1": [4, 5, 6, 7, 8]}, dtype="Int64")
-        self._run_analytic("out1 = list(range(4, 9))", {}, {"out1": out1_df}, True, "")
+        self._run_analytic("out1 = list(range(4, 9))", {}, {"out1": out1_df}, True, None)
 
     def test_no_outputs(self):
         """Test a data function that has no outputs."""
-        self._run_analytic("print(in1 * in2)", {"in1": 2, "in2": 3}, {}, True, """
-Standard output:
-6
-""")
+        expected = _PythonVersionedExpectedValue("no_outputs")
+        self._run_analytic("print(in1 * in2)", {"in1": 2, "in2": 3}, {}, True, expected)
 
     def test_range(self):
         """Test a data function that returns a range object."""
         out1_df = pd.DataFrame({"out1": [4, 5, 6, 7, 8]}, dtype="Int64")
-        self._run_analytic("out1 = range(4, 9)", {}, {"out1": out1_df}, True, "")
+        self._run_analytic("out1 = range(4, 9)", {}, {"out1": out1_df}, True, None)
 
     def test_set(self):
         """Test a data function that returns a set object."""
         out1_df = pd.DataFrame({"out1": [42, 100]}, dtype="Int64")
-        self._run_analytic("out1 = {42, 100}", {}, {"out1": out1_df}, True, "")
+        self._run_analytic("out1 = {42, 100}", {}, {"out1": out1_df}, True, None)
 
     def test_exception_pysrv78(self):
         """Test That stdout is returned along with error message"""
+        expected = _PythonVersionedExpectedValue("exception_pysrv78")
         self._run_analytic("""print("You should see this!")
 print("And this!")
 x = a*b
-print("But not this.")""", {}, {}, False, """Error executing Python script:
-
-NameError: name 'a' is not defined
-
-Traceback (most recent call last):
-  File "data_function.py", line 324, in _execute_script
-    exec(compiled_script, self.globals)
-  File "<data_function>", line 3, in <module>
-
-Standard output:
-You should see this!
-And this!
-""")
+print("But not this.")""", {}, {}, False, expected)
 
     def test_warning_pysrv79(self):
         """Test that warnings are returned."""
-        def expected():
-            # pylint: disable=no-else-return
-            if sys.version_info.major == 3 and sys.version_info.minor < 8:
-                return """
-Standard error:
-<string>:4: Warning: This is a Warning
-<string>:5: UserWarning: This is a UserWarning
-<string>:6: DeprecationWarning: This is a DeprecationWarning
-<string>:7: SyntaxWarning: This is a SyntaxWarning
-<string>:8: RuntimeWarning: This is a RuntimeWarning
-<string>:9: FutureWarning: This is a FutureWarning
-<string>:10: PendingDeprecationWarning: This is a PendingDeprecationWarning
-<string>:11: ImportWarning: This is a ImportWarning
-<string>:12: UnicodeWarning: This is a UnicodeWarning
-<string>:13: BytesWarning: This is a BytesWarning
-<string>:14: ResourceWarning: This is a ResourceWarning
-"""
-            else:
-                return """
-Standard error:
-<data_function>:4: Warning: This is a Warning
-<data_function>:5: UserWarning: This is a UserWarning
-<data_function>:6: DeprecationWarning: This is a DeprecationWarning
-<data_function>:7: SyntaxWarning: This is a SyntaxWarning
-<data_function>:8: RuntimeWarning: This is a RuntimeWarning
-<data_function>:9: FutureWarning: This is a FutureWarning
-<data_function>:10: PendingDeprecationWarning: This is a PendingDeprecationWarning
-<data_function>:11: ImportWarning: This is a ImportWarning
-<data_function>:12: UnicodeWarning: This is a UnicodeWarning
-<data_function>:13: BytesWarning: This is a BytesWarning
-<data_function>:14: ResourceWarning: This is a ResourceWarning
-"""
-
+        expected = _PythonVersionedExpectedValue("warning_pysrv79")
         self._run_analytic("""import warnings
 warnings.simplefilter("always")
 from warnings import warn
@@ -420,62 +268,36 @@ warn("This is a ResourceWarning", ResourceWarning)""", {}, {}, True, expected)
 
     def test_stderr_pysrv116(self):
         """Test that stdout is returned correctly with stderr"""
+        expected = _PythonVersionedExpectedValue("stderr_pysrv116")
         self._run_analytic("""print("apa")
-output = Exception("bepa")""", {}, {}, True, """
-Standard output:
-apa
-""")
+output = Exception("bepa")""", {}, {}, True, expected)
 
     def test_stderr_pysrv116_2(self):
         """Test that stdout is returned correctly with stderr"""
+        expected = _PythonVersionedExpectedValue("stderr_pysrv116_2")
         self._run_analytic("""print("apa")
-raise Exception("bepa")""", {}, {}, False, """Error executing Python script:
-
-Exception: bepa
-
-Traceback (most recent call last):
-  File "data_function.py", line 324, in _execute_script
-    exec(compiled_script, self.globals)
-  File "<data_function>", line 2, in <module>
-
-Standard output:
-apa
-""")
+raise Exception("bepa")""", {}, {}, False, expected)
 
     def test_stderr_pysrv116_d(self):
         """Test that stdout is returned correctly with stderr"""
+        expected = _PythonVersionedExpectedValue("stderr_pysrv116_d")
         self._run_analytic("""print("This code is really executed. (D)")
 from pathlib import Path
-output = int(10000000000000000000000000000000000000000000000000000000000000000)""", {}, {}, True, """
-Standard output:
-This code is really executed. (D)
-""")
+output = int(10000000000000000000000000000000000000000000000000000000000000000)""", {}, {}, True, expected)
 
     def test_stderr_pysrv116_e(self):
         """Test that stdout is returned correctly with stderr"""
+        expected = _PythonVersionedExpectedValue("stderr_pysrv116_e")
         self._run_analytic("""# Fifth example (like in the Description of this JIRA issue).
 print("This code is really executed. (E)")
 from pathlib import Path
 output = Exception("apa")
-print("(and this too) (E2)")""", {}, {}, True, """
-Standard output:
-This code is really executed. (E)
-(and this too) (E2)
-""")
+print("(and this too) (E2)")""", {}, {}, True, expected)
 
     def test_output_not_defined(self):
         """Test when the expected outputs are not defined by the Python script."""
-
-        self._run_analytic("out2 = 1", {}, {"out1": None}, False, """Error executing Python script:
-
-spotfire.data_function.DataFunctionError: Output variable 'out1' was not defined
-
-Traceback (most recent call last):
-  File "data_function.py", line 255, in evaluate
-    self._write_outputs(result)
-  File "data_function.py", line 346, in _write_outputs
-    raise DataFunctionError(f"Output variable '{output.name}' was not defined")
-""")
+        expected = _PythonVersionedExpectedValue("output_not_defined")
+        self._run_analytic("out2 = 1", {}, {"out1": None}, False, expected)
 
     def test_table_metadata(self):
         """Test that table metadata goes in and comes out."""
@@ -487,20 +309,7 @@ Traceback (most recent call last):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             out_md_df.spotfire_table_metadata = {'a': ['Alpha']}
-
-        def expected():
-            # pylint: disable=no-else-return
-            if sys.version_info.major == 3 and sys.version_info.minor < 8:
-                return """
-Standard error:
-<string>:3: UserWarning: Pandas doesn't allow columns to be created via a new attribute name - see https://pandas.pydata.org/pandas-docs/stable/indexing.html#attribute-access
-"""
-            else:
-                return """
-Standard error:
-<data_function>:3: UserWarning: Pandas doesn't allow columns to be created via a new attribute name - see https://pandas.pydata.org/pandas-docs/stable/indexing.html#attribute-access
-"""
-
+        expected = _PythonVersionedExpectedValue("table_metadata")
         self._run_analytic("""import pandas as pd
 out_md = pd.DataFrame(in1.spotfire_table_metadata)
 out_md.spotfire_table_metadata = {'a': ['Alpha']}""", {"in1": in1_df}, {"out_md": out_md_df}, True, expected)
@@ -517,42 +326,27 @@ import spotfire
 b = pd.Series([1.0, 2.0, 3.0], name='b')
 out1 = pd.concat([in1, b], axis=1)
 spotfire.copy_metadata(in1, out1)
-out1['b'].spotfire_column_metadata = {'b': ['Bravo']}""", {'in1': in1_df}, {'out1': out1_df}, True, "")
+out1['b'].spotfire_column_metadata = {'b': ['Bravo']}""", {'in1': in1_df}, {'out1': out1_df}, True, None)
 
     def test_column_rename(self):
         """Test that a column renamed in a data function processes correctly."""
         in1_series = pd.Series([1.0, 2.0, 3.0], name="a")
         out1_df = pd.DataFrame({"b": [1.0, 2.0, 3.0]})
         self._run_analytic("""out1 = in1
-out1 = out1.rename('b')""", {"in1": in1_series}, {"out1": out1_df}, True, "")
+out1 = out1.rename('b')""", {"in1": in1_series}, {"out1": out1_df}, True, None)
 
     def test_missing_input(self):
         """Test an unsupplied (NULL) input is registered as None"""
-        self._run_analytic("""print(in1)""", {"in1": None}, {}, True, """
-Standard output:
-None
-""")
+        expected = _PythonVersionedExpectedValue("missing_input")
+        self._run_analytic("""print(in1)""", {"in1": None}, {}, True, expected)
 
     def test_nested_exception(self):
         """Test a nested exception is properly displayed"""
+        expected = _PythonVersionedExpectedValue("nested_exception")
         self._run_analytic("""try:
     raise ValueError("root exception")
 except Exception as e:
-    raise TypeError("parent exception") from e""", {}, {}, False, """Error executing Python script:
-
-TypeError: parent exception
-
-Traceback (most recent call last):
-  File "data_function.py", in _execute_script
-    exec(compiled_script, self.globals)
-  File "<data_function>", in <module>
-
-The following exception was the direct cause of the above exception:
-
-Traceback (most recent call last):
-  File "<data_function>", in <module>
-ValueError: root exception
-""")
+    raise TypeError("parent exception") from e""", {}, {}, False, expected)
 
     def test_debug_log(self):
         """Test that the debug log can be enabled"""
@@ -561,76 +355,21 @@ ValueError: root exception
             warnings.simplefilter("ignore")
             in1_df.spotfire_table_metadata = {"tbl_1": [1]}
         in1_df["a"].spotfire_column_metadata = {"col_a_1": [10]}
-        self._run_analytic("in1", {"in1": in1_df}, {}, True, """
-Debug log:
-debug: start evaluate
-debug: reading 1 input variables
-debug: assigning table 'in1' from file temp.sbdf
-debug: read 5 rows 1 columns
-debug: table metadata:
- {'tbl_1': [1]}
-debug: column metadata:
- a: {'col_a_1': [10]}
-debug: done reading 1 input variables
-debug: executing script
-debug: --- script ---
-in1
-debug: --- script ---
-debug: analytic_type is 'script'
-debug: done executing script
-debug: writing 0 output variables
-debug: done writing 0 output variables
-debug: end evaluate
-""", debug=True)
+        expected = _PythonVersionedExpectedValue("debug_log")
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, debug=True)
 
     def test_debug_log_omit(self):
         """Test that blank metadata is omitted from the debug log"""
         # All columns have no metadata
         in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
-        self._run_analytic("in1", {"in1": in1_df}, {}, True, """
-Debug log:
-debug: start evaluate
-debug: reading 1 input variables
-debug: assigning table 'in1' from file temp.sbdf
-debug: read 5 rows 1 columns
-debug: table metadata: (no table metadata present)
-debug: column metadata: (no column metadata present)
-debug: done reading 1 input variables
-debug: executing script
-debug: --- script ---
-in1
-debug: --- script ---
-debug: analytic_type is 'script'
-debug: done executing script
-debug: writing 0 output variables
-debug: done writing 0 output variables
-debug: end evaluate
-""", debug=True)
+        expected = _PythonVersionedExpectedValue("debug_log_omit_1")
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, debug=True)
 
         # Some columns have no metadata
         in2_df = pd.DataFrame({"a": [1, 2, 3, 4, 5], "b": [6, 7, 8, 9, 10]})
         in2_df['b'].spotfire_column_metadata = {"col_b_1": [11]}
-        self._run_analytic("in2", {"in2": in2_df}, {}, True, """
-Debug log:
-debug: start evaluate
-debug: reading 1 input variables
-debug: assigning table 'in2' from file temp.sbdf
-debug: read 5 rows 2 columns
-debug: table metadata: (no table metadata present)
-debug: column metadata:
- b: {'col_b_1': [11]}
- (columns without metadata have been omitted)
-debug: done reading 1 input variables
-debug: executing script
-debug: --- script ---
-in2
-debug: --- script ---
-debug: analytic_type is 'script'
-debug: done executing script
-debug: writing 0 output variables
-debug: done writing 0 output variables
-debug: end evaluate
-""", debug=True)
+        expected = _PythonVersionedExpectedValue("debug_log_omit_2")
+        self._run_analytic("in2", {"in2": in2_df}, {}, True, expected, debug=True)
 
     def test_debug_log_truncate(self):
         """Test that column metadata is truncated properly"""
@@ -640,31 +379,5 @@ debug: end evaluate
         in1_df = pd.DataFrame(in1_dict)
         for i in range(10000):
             in1_df[f"num{i}"].spotfire_column_metadata = {f"col_num{i}_1": [i]}
-
-        def expected():
-            expect = """
-Debug log:
-debug: start evaluate
-debug: reading 1 input variables
-debug: assigning table 'in1' from file temp.sbdf
-debug: read 3 rows 10000 columns
-debug: table metadata: (no table metadata present)
-debug: column metadata:
-"""
-            for i in range(2315):
-                expect += f" num{i}: {{'col_num{i}_1': [{i}]}}\n"
-            expect += """ (truncated due to length)
-debug: done reading 1 input variables
-debug: executing script
-debug: --- script ---
-in1
-debug: --- script ---
-debug: analytic_type is 'script'
-debug: done executing script
-debug: writing 0 output variables
-debug: done writing 0 output variables
-debug: end evaluate
-"""
-            return expect
-
+        expected = _PythonVersionedExpectedValue("debug_log_truncate")
         self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, debug=True)

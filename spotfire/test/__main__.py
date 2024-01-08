@@ -30,7 +30,7 @@ if test_env:
     report_title_suffix = f" ({test_env} test environment)"
     report_name = f"{platform.system().lower()}-{py_version}-{test_env}"
 else:
-    report_title_suffix = ""
+    report_title_suffix = f""  # pylint: disable=f-string-without-interpolation
     report_name = f"{platform.system().lower()}-{py_version}"
 runner = HtmlTestRunner.HTMLTestRunner(combine_reports=True,
                                        output="build/test-results/",

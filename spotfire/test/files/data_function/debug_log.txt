@@ -1,0 +1,20 @@
+
+Debug log:
+debug: start evaluate
+debug: reading 1 input variables
+debug: assigning table 'in1' from file temp.sbdf
+debug: read 5 rows 1 columns
+debug: table metadata:
+ {'tbl_1': [1]}
+debug: column metadata:
+ a: {'col_a_1': [10]}
+debug: done reading 1 input variables
+debug: executing script
+debug: --- script ---
+in1
+debug: --- script ---
+debug: analytic_type is 'script'
+debug: done executing script
+debug: writing 0 output variables
+debug: done writing 0 output variables
+debug: end evaluate
