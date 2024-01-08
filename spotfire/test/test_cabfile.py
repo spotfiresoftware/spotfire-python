@@ -10,6 +10,8 @@ from spotfire.test import utils
 
 class CabFileTest(unittest.TestCase):
     """Unit tests for public functions in 'spotfire.cabfile' module."""
+    # pylint: disable=not-context-manager
+
     def _platform_requirement(self):
         """Correctly manage skipping tests on non-Windows platforms."""
         if platform.system() != "Windows":
