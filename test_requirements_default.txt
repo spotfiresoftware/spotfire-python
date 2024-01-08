@@ -1,6 +1,6 @@
 -r spotfire/requirements.txt
 
-unittest-xml-reporting
+html-testRunner
 geopandas
 matplotlib
 pillow

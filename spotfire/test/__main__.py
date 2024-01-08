@@ -1,11 +1,14 @@
-"""Run unit tests from the command line and output a JUnit-compatible result file.
+"""Run unit tests from the command line and output an HTML result file.
 
 $ python -m spotfire.test
 """
 
 import os
+import platform
+import sys
 import unittest
-import xmlrunner
+
+import HtmlTestRunner
 
 from spotfire.test import utils
 
@@ -21,6 +24,18 @@ def load_tests(loader, tests, pattern):  # pylint: disable=unused-argument
     return test_suite
 
 
-with open(f"results-{os.environ.get('RESULTS_NAME', utils.PYTHON_VERSION)}.xml", "wb") as output:
-    unittest.main(testRunner=xmlrunner.XMLTestRunner(output=output, resultclass=utils.PythonVersionModifiedResult),
-                  failfast=False, buffer=False, catchbreak=False)
+py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+test_env = os.getenv("TEST_ENVIRONMENT")
+if test_env:
+    report_title_suffix = f" ({test_env} test environment)"
+    report_name = f"{platform.system().lower()}-{py_version}-{test_env}"
+else:
+    report_title_suffix = ""
+    report_name = f"{platform.system().lower()}-{py_version}"
+runner = HtmlTestRunner.HTMLTestRunner(combine_reports=True,
+                                       output="build/test-results/",
+                                       template=utils.get_test_data_file("template.html.in"),
+                                       report_title=f"Python {py_version} on {platform.system()}{report_title_suffix}",
+                                       report_name=report_name,
+                                       add_timestamp=False)
+unittest.main(testRunner=runner, failfast=False, buffer=False, catchbreak=False)

@@ -13,8 +13,7 @@ __pycache__/
 *.pdb
 *.so
 
-# unit test results files
-/results-*.xml
+# unit test output files
 /spotfire/test/output.sbdf
 
 # distribution

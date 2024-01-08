@@ -128,13 +128,13 @@ jobs:
         run: |
           python -m spotfire.test
         env:
-          RESULTS_NAME: ${{ matrix.python-version }}-${{ matrix.operating-system }}-${{ matrix.test-environment }}
           TEST_FILES_DIR: ${{ github.workspace }}/test-files/spotfire/test/files
+          TEST_ENVIRONMENT: ${{ matrix.test-environment }}
       - uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: test-results-${{ matrix.python-version }}-${{ matrix.operating-system }}-${{ matrix.test-environment }}
-          path: 'results-*.xml'
+          path: 'build/test-results/*.html'
   lint:
     name: Static Analysis
     needs: [build-sdist, build-wheel]
