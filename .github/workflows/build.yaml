@@ -14,7 +14,7 @@ jobs:
           python-version: '3.x'
       - name: Install Tools
         run: |
-          pip install -r build
+          pip install build
       - name: Source Packaging
         run: |
           python -m build --sdist
