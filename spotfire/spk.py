@@ -774,13 +774,7 @@ def python(args, hook=None) -> None:
     if analyst:
         package_builder = _CabPackageBuilder()
         package_builder.excludes = getattr(args, "exclude")
-        package_builder.cert_file = getattr(args, "cert")
-        package_builder.cert_password = getattr(args, "password")
-        package_builder.cert_store_machine = getattr(args, "store_machine")
-        package_builder.cert_store_name = getattr(args, "store_name")
-        package_builder.cert_store_cn = getattr(args, "store_cn")
-        package_builder.timestamp_url = getattr(args, "timestamp")
-        package_builder.sha256 = getattr(args, "sha256")
+        _process_signing_options(args, package_builder)
     else:
         package_builder = _ZipPackageBuilder()
         package_builder.excludes = getattr(args, "exclude")
@@ -861,13 +855,7 @@ def packages(args) -> None:
         analyst = getattr(args, "analyst")
         if analyst:
             package_builder = _CabPackageBuilder()
-            package_builder.cert_file = getattr(args, "cert")
-            package_builder.cert_password = getattr(args, "password")
-            package_builder.cert_store_machine = getattr(args, "store_machine")
-            package_builder.cert_store_name = getattr(args, "store_name")
-            package_builder.cert_store_cn = getattr(args, "store_cn")
-            package_builder.timestamp_url = getattr(args, "timestamp")
-            package_builder.sha256 = getattr(args, "sha256")
+            _process_signing_options(args, package_builder)
             brand_subkey = "Analyst"
         else:
             package_builder = _ZipPackageBuilder()
@@ -922,6 +910,21 @@ def packages(args) -> None:
         _brand_file(requirements_file, brand, "## spotfire.spk: ")
     finally:
         package_builder.cleanup()
+
+
+def _process_signing_options(args, package_builder) -> None:
+    """Process command line options for code signing.
+
+    :param args: the command line arguments processed by argparse
+    :param package_builder: the ``PackageBuilder`` object to configure
+    """
+    package_builder.cert_file = getattr(args, "cert")
+    package_builder.cert_password = getattr(args, "password")
+    package_builder.cert_store_machine = getattr(args, "store_machine")
+    package_builder.cert_store_name = getattr(args, "store_name")
+    package_builder.cert_store_cn = getattr(args, "store_cn")
+    package_builder.timestamp_url = getattr(args, "timestamp")
+    package_builder.sha256 = getattr(args, "sha256")
 
 
 def _promote_brand(brand: typing.Dict, analyst: bool) -> typing.Dict:
