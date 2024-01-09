@@ -1,9 +1,0 @@
--r spotfire/requirements.txt
-
-html-testRunner
-geopandas
-matplotlib
-pillow >= 10.0.0
-seaborn
-shapely
-Cython >= 3.0

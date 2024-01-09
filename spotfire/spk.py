@@ -9,7 +9,7 @@ import argparse
 import datetime
 import fileinput
 import glob
-from importlib import metadata as imp_md, resources as imp_res
+from importlib import metadata as imp_md
 import io
 import json
 import locale
@@ -403,9 +403,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :return: `package_versions`, but with duplicate packages removed from the mapping
         """
         # Use the spotfire requirements file as a deny list.
-        with imp_res.files("spotfire").joinpath("requirements.txt").open("r", encoding="utf-8") as deny_file:
-            deny_requirements = deny_file.read()
-            deny_list = self.requirements_from(deny_requirements)
+        deny_list = self.requirements_of("spotfire")
 
         # Find all distributions in the temp directory
         dist_info_dirs = glob.glob(os.path.join(tempdir, "*.dist-info"))
@@ -446,6 +444,17 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     self._process_package_requirements(child_req, None, seen)
                     for child_extra in child_req.extras:
                         self._process_package_requirements(child_req, child_extra, seen)
+
+    def requirements_of(self, package: str, extra: str = None) -> typing.Set[str]:
+        """Determine the requirements recursively of a package.
+
+        :param package: the name of the package
+        :param extra: the extra for the package
+        :returns: set of package names that are recursively as requirements of the package
+        """
+        packages_seen = set()
+        self._process_package_requirements(pkg_req.Requirement(package), extra, packages_seen)
+        return packages_seen
 
     def requirements_from(self, requirements: str) -> typing.Set[str]:
         """Determine the requirements recursively of a requirements file.
@@ -807,10 +816,13 @@ def python(args, hook=None) -> None:
     package_builder.scan_python_installation(prefix)
     package_builder.scan_path_configuration_file(prefix)
     package_builder.scan_spotfire_package(prefix)
-    spotfire_requirements = os.path.join(spotfire.__path__[0], "requirements.txt")
     try:
+        with tempfile.NamedTemporaryFile(mode="wt", prefix="req", suffix=".txt", encoding="utf-8",
+                                         delete=False) as spotfire_requirements:
+            for req in imp_md.requires("spotfire"):
+                print(req, file=spotfire_requirements)
         constraints = getattr(args, "constraint")
-        package_builder.scan_requirements_txt(spotfire_requirements, constraints, prefix)
+        package_builder.scan_requirements_txt(spotfire_requirements.name, constraints, prefix)
         if hook is not None:
             hook.scan_finished(package_builder)
 
@@ -818,6 +830,7 @@ def python(args, hook=None) -> None:
         package_builder.build()
     finally:
         package_builder.cleanup()
+        os.remove(spotfire_requirements.name)
 
 
 @subcommand([argument("spk-file", help="path to the SPK file to build"),

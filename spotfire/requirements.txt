@@ -1,9 +1,0 @@
-# DataFrame support
-pandas>=0.24.0,!=1.0.2,!=1.0.3
-numpy>=1.22,<2.0
-
-# Package interactions
-packaging
-pip
-setuptools
-wheel

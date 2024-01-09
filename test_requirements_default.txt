@@ -1,5 +1,3 @@
--r spotfire/requirements.txt
-
 html-testRunner
 geopandas
 matplotlib

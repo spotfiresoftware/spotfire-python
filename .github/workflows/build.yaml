@@ -14,12 +14,10 @@ jobs:
           python-version: '3.x'
       - name: Install Tools
         run: |
-          mkdir dist
-          python .github/scripts/parse_pyproject_toml.py --section build-system --key requires --array --string > dist/pyproj-requires.txt
-          pip install -r dist/pyproj-requires.txt
+          pip install -r build
       - name: Source Packaging
         run: |
-          python setup.py sdist
+          python -m build --sdist
       - uses: actions/upload-artifact@v3
         with:
           name: sdist
@@ -68,7 +66,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install Build Requirements
         run: |
-          pip install auditwheel -r dist/pyproj-requires.txt
+          pip install auditwheel build
       - name: Build Wheel (Linux)
         if: matrix.operating-system == 'ubuntu-latest'
         run: |
@@ -76,7 +74,7 @@ jobs:
           tar xzf dist/spotfire-*.tar.gz
           cd spotfire-*
           # Build wheel
-          python setup.py bdist_wheel
+          python -m build --wheel
           # Convert wheel to manylinux
           auditwheel repair -w ../dist --plat manylinux2014_x86_64 dist/*.whl
       - name: Build Wheel (Windows)
@@ -86,7 +84,7 @@ jobs:
           tar xzf $((dir dist\spotfire-*.tar.gz).FullName)
           cd spotfire-*
           # Build wheel
-          python setup.py bdist_wheel
+          python -m build --wheel
           # Move wheel out of build dir into top-level dist dir 
           mv dist\*.whl ..\dist
       - uses: actions/upload-artifact@v3
@@ -159,7 +157,7 @@ jobs:
           name: analysis-files
       - name: Install Tools
         run: |
-          pip install dist/*.whl -r requirements_lint.txt
+          pip install `ls dist/*.whl`[lint]
       - name: Static Analysis with pylint
         run: |
           pylint spotfire

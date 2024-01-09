@@ -11,15 +11,6 @@ from Cython.Distutils import Extension, build_ext
 import numpy as np
 
 
-def get_requires(filename):
-    requirements = []
-    with open(filename, "rt") as req_file:
-        for line in req_file.read().splitlines():
-            if not line.strip().startswith("#"):
-                requirements.append(line)
-    return requirements
-
-
 class BuildExtDebug(build_ext):
     def finalize_options(self):
         if sys.platform == "win32":
@@ -33,14 +24,10 @@ class BuildExtDebug(build_ext):
         super().finalize_options()
 
 
-project_requirements = get_requires("spotfire/requirements.txt")
 version = {}
 with open('spotfire/version.py') as ver_file:
     exec(ver_file.read(), version)
     
-with open("README.md", "r") as fh:
-    long_description = fh.read()
-
 if sys.platform == "win32":
     platform_filename = "_windows"
     cabfile_libraries = ['cabinet']
@@ -89,27 +76,8 @@ extensions = [
 ]
 
 setup(
-    name='spotfire',
     version=version['__version__'],
-    description='Package for Building Python Extensions to Spotfire',
-    long_description=long_description,
-    long_description_content_type='text/markdown',
-    author='Cloud Software Group, Inc.',
-    maintainer='Spotfire Python Package Support',
-    maintainer_email='spotfirepython@tibco.com',
-    url='https://github.com/spotfiresoftware/spotfire-python',
-    license='BSD 3-Clause License',
     packages=find_packages(exclude=['spotfire.test.files']),
     ext_modules=extensions,
     cmdclass={'build_ext_debug': BuildExtDebug},
-    include_package_data=True,
-    install_requires=project_requirements,
-    python_requires='>=3.8',
-    classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'License :: OSI Approved :: BSD License',
-        'Operating System :: OS Independent',
-        'Programming Language :: Python',
-        'Programming Language :: Cython',
-    ],
 )
