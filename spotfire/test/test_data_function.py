@@ -42,7 +42,7 @@ class _PythonVersionedExpectedValue:
 
 class DataFunctionTest(unittest.TestCase):
     """Unit tests for public functions in 'spotfire.data_function' module."""
-    # pylint: disable=too-many-branches, too-many-statements, too-many-arguments, too-many-public-methods, line-too-long
+    # pylint: disable=too-many-branches, too-many-statements, too-many-arguments, too-many-public-methods
 
     def _run_analytic(self, script, inputs, outputs, success, expected_result, debug=False) -> None:
         """Run a full pass through the analytic protocol, and compare the output to the expected value."""

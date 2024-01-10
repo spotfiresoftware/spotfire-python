@@ -161,7 +161,7 @@ class _SpkVersion:
     def __lt__(self, other):
         if not isinstance(other, _SpkVersion):
             return NotImplemented
-        return self._versions < other._versions  # pylint: disable=protected-access
+        return self._versions < other._versions
 
 
 def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int = 72) -> None:
@@ -330,7 +330,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         if constraint:
             command.extend(["--constraint", constraint])
         pip_install = subprocess.run(command, check=False)
-        if pip_install.returncode != 0:
+        if pip_install.returncode:
             _error("Error installing required packages.  Aborting.")
             self.cleanup()
             sys.exit(1)
@@ -339,7 +339,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         command = [sys.executable, "-m", "pip", "list", "--disable-pip-version-check", "--path", tempdir,
                    "--format", "json"]
         pip_list = subprocess.run(command, capture_output=True, check=False)
-        if pip_list.returncode != 0:
+        if pip_list.returncode:
             _error("Error installing required packages.  Aborting.")
             self.cleanup()
             sys.exit(1)
@@ -486,7 +486,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
 
             # Clean any empty directories created by the file deletion
             file_dir = os.path.dirname(file_loc)
-            while file_dir != tempdir and len(os.listdir(file_dir)) == 0:
+            while file_dir != tempdir and not os.listdir(file_dir):
                 os.rmdir(file_dir)
                 file_dir = os.path.dirname(file_dir)
 
@@ -599,8 +599,6 @@ def _et_indent(element: ElementTree.Element, indent="  ", level=0) -> None:
 
 
 class _ZipPackageBuilder(_PackageBuilder):
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self):
         super().__init__()
         self.chmod_script_name = None
@@ -710,11 +708,10 @@ class _CabPackageBuilder(_PackageBuilder):
 
     def _build_payload(self, metadata: ElementTree.Element, module: ElementTree.Element, payload_dest: str) -> None:
         """Build the main payload archive for the SPK package."""
-        # pylint: disable=import-outside-toplevel,no-name-in-module
+        # pylint: disable=import-outside-toplevel
         from spotfire import cabfile, codesign
         metadata_files = metadata.find("Files")
 
-        # pylint: disable=not-context-manager
         with cabfile.CabFile(payload_dest) as payload:
             # Add all files that are supposed to go into the package
             for filename_ondisk, filename_payload in self._contents:
@@ -861,8 +858,6 @@ def python(args, hook=None) -> None:
              ])
 def packages(args) -> None:
     """Package a list of Python packages as an SPK package"""
-    # pylint: disable=too-many-statements
-
     try:
         # Set up the package builder
         analyst = getattr(args, "analyst")

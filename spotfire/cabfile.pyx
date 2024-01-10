@@ -14,3 +14,9 @@ class CabFile:
         :param file: filename of the cabinet file
         """
         raise OSError("Cabinet files not supported on non-Win32 platforms")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass

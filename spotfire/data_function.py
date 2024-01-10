@@ -54,14 +54,18 @@ class _OutputCapture:
 
         :return: string containing the output stream, or `None` if no output was captured
         """
-        return None if self._stdout.tell() == 0 else self._stdout.getvalue()
+        if self._stdout.tell():
+            return self._stdout.getvalue()
+        return None
 
     def get_stderr(self) -> typing.Optional[str]:
         """Return the captured standard error stream.
 
         :return: string containing the error stream, or `None` if no output was captured
         """
-        return None if self._stderr.tell() == 0 else self._stderr.getvalue()
+        if self._stderr.tell():
+            return self._stderr.getvalue()
+        return None
 
 
 class AnalyticInput:
@@ -121,7 +125,7 @@ class AnalyticInput:
                     column_blank = True
             except AttributeError:
                 column_blank = True
-        if pretty_column.tell() != 0:
+        if pretty_column.tell():
             column_meta = pretty_column.getvalue()
         else:
             column_meta = " (no column metadata present)"
@@ -178,9 +182,6 @@ class AnalyticOutput:
 class AnalyticResult:
     """Represents the results of evaluating an AnalyticSpec object."""
 
-    # pylint: disable=too-many-instance-attributes
-    # Eight is reasonable in this case.
-
     def __init__(self) -> None:
         self.success = True
         self.has_stderr = False
@@ -222,7 +223,6 @@ class AnalyticResult:
 
 class AnalyticSpec:
     """Represents an analytic spec used to process a data function."""
-
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, analytic_type: str, inputs: typing.List[AnalyticInput], outputs: typing.List[AnalyticOutput],
@@ -330,10 +330,10 @@ class AnalyticSpec:
         """read inputs"""
         self.debug(f"reading {len(self.inputs)} input variables")
         for i, input_ in enumerate(self.inputs):
-            if _bad_string(input_.name) or input_.name == "":
+            if _bad_string(input_.name) or not input_.name:
                 self.debug(f"input {i}: bad input variable name - skipped")
                 continue
-            if input_.type != "NULL" and (_bad_string(input_.file) or input_.file == ""):
+            if input_.type != "NULL" and (_bad_string(input_.file) or not input_.file):
                 self.debug(f"input '{input_.name}': bad file name - skipped")
                 continue
             if input_.type != "NULL" and not os.path.isfile(input_.file):
@@ -375,10 +375,10 @@ class AnalyticSpec:
         """write outputs"""
         self.debug(f"writing {len(self.outputs)} output variables")
         for i, output in enumerate(self.outputs):
-            if _bad_string(output.name) or output.name == "":
+            if _bad_string(output.name) or not output.name:
                 self.debug(f"output {i}: bad output variable name - skipped")
                 continue
-            if _bad_string(output.file) or output.file == "":
+            if _bad_string(output.file) or not output.file:
                 self.debug(f"output '{output.name}': bad file name - skipped")
                 continue
             if output.name not in self.globals:
@@ -410,8 +410,7 @@ class AnalyticSpec:
                     try:
                         # If it was a syntax error, show the text with the caret
                         exc_type = _utils.type_name(result.get_exc_info()[0])
-                        # pylint: disable=consider-using-in
-                        if exc_type == "SyntaxError" or exc_type == "IndentationError" or exc_type == "TabError":
+                        if exc_type in ("SyntaxError", "IndentationError", "TabError"):
                             syntax_error = traceback.TracebackException(result.get_exc_info()[0],
                                                                         result.get_exc_info()[1],
                                                                         result.get_exc_info()[2])
