@@ -152,10 +152,11 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: analysis-files
+          path: analysis
       - name: Install Tools
         run: |
           pip install `ls dist/*.whl`[lint]
       - name: Static Analysis with pylint
         run: |
-          cd analysis-files
+          cd analysis
           pylint spotfire
