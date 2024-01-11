@@ -32,9 +32,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: analysis-files
-          path: |
-            pylintrc
-            requirements_lint.txt
+          path: 'pyproject.toml'
       - name: Dynamic Elements
         id: dynamic
         run: |
@@ -159,4 +157,5 @@ jobs:
           pip install `ls dist/*.whl`[lint]
       - name: Static Analysis with pylint
         run: |
+          cd analysis-files
           pylint spotfire
