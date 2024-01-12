@@ -163,5 +163,7 @@ jobs:
       - name: Run Analysis Tools
         run: |
           cd analysis
+          mkdir .save && mv spotfire vendor .save
           pylint spotfire
+          mv .save/* . && rmdir .save
           cython-lint spotfire vendor
