@@ -16,7 +16,8 @@ cdef extern from "<windows.h>" nogil:
     cdef enum:
         S_OK
 
-    # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
+    # Function defined at
+    # https://docs.microsoft.com/en-us/windows/win32/api/errhandlingapi/nf-errhandlingapi-getlasterror
     cdef DWORD GetLastError()
 
     # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibrarya
@@ -28,7 +29,8 @@ cdef extern from "<windows.h>" nogil:
     # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-getprocaddress
     cdef void* GetProcAddress(HANDLE, char*)
 
-    # Function defined at https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
+    # Function defined at
+    # https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
     cdef int MultiByteToWideChar(UINT, DWORD, LPCSTR, int, LPWSTR, int)
 
     # Preprocessor definitions defined at https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers

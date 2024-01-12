@@ -3,7 +3,7 @@
 # in the license file that is distributed with this file.
 
 cdef extern from "cabfile_helpers.h":
-    ### FCI callback functions
+    # FCI callback functions
     fci.PFNFCIALLOC _fci_cb_alloc
     fci.PFNFCIFREE _fci_cb_free
     fci.PFNFCIOPEN _fci_cb_open

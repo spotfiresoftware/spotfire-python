@@ -155,9 +155,9 @@ cpdef void codesign_file_from_store(filename,
 
 cdef windows.LPCWSTR _object_to_wstr(object obj):
     """Convert a Python object into a Windows wide string.
-    
+
     :param obj: Python object to convert
-    :return: wide string buffer containing the converted string.  The caller is responsible for cleaning up this 
+    :return: wide string buffer containing the converted string.  The caller is responsible for cleaning up this
     buffer using the native ``free`` function (from the Cython ``libc.stdlib`` module).
     """
     cdef int len_
@@ -207,13 +207,16 @@ cdef void _codesign_file_core(filename,
         signer_sign_ex_fun = <mssign32.SignerSignExType>windows.GetProcAddress(mssign32_library, "SignerSignEx")
         if signer_sign_ex_fun is NULL:
             raise CodesignError("Cannot find function 'SignerSignEx'")
-        signer_time_stamp_fun = <mssign32.SignerTimeStampType>windows.GetProcAddress(mssign32_library, "SignerTimeStamp")
+        signer_time_stamp_fun = <mssign32.SignerTimeStampType>(
+            windows.GetProcAddress(mssign32_library, "SignerTimeStamp"))
         if signer_time_stamp_fun is NULL:
             raise CodesignError("Cannot find function 'SignerTimeStamp'")
-        signer_time_stamp_ex2_fun = <mssign32.SignerTimeStampEx2Type>windows.GetProcAddress(mssign32_library, "SignerTimeStampEx2")
+        signer_time_stamp_ex2_fun = <mssign32.SignerTimeStampEx2Type>(
+            windows.GetProcAddress(mssign32_library, "SignerTimeStampEx2"))
         if signer_time_stamp_ex2_fun is NULL:
             raise CodesignError("Cannot find function 'SignerTimeStampEx2'")
-        signer_free_signer_context_fun = <mssign32.SignerFreeSignerContextType>windows.GetProcAddress(mssign32_library, "SignerFreeSignerContext")
+        signer_free_signer_context_fun = <mssign32.SignerFreeSignerContextType>(
+            windows.GetProcAddress(mssign32_library, "SignerFreeSignerContext"))
         if signer_free_signer_context_fun is NULL:
             raise CodesignError("Cannot find function 'SignerFreeSignerContext'")
 
@@ -233,7 +236,8 @@ cdef void _codesign_file_core(filename,
                 found_private_key = True
             else:
                 cert_context = wincrypt.CertFindCertificateInStore(cert_store,
-                                                                   wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
+                                                                   wincrypt.X509_ASN_ENCODING |
+                                                                   wincrypt.PKCS_7_ASN_ENCODING,
                                                                    0, cert_find_type, cert_find_param, cert_context)
                 if cert_context is NULL:
                     raise CodesignError("Could not get certificate from store")

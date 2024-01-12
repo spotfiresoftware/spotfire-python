@@ -6,6 +6,7 @@
 
 """Tools to create Microsoft cabinet files.  Only defined on Windows platforms."""
 
+
 class CabFile:
     """Class with methods to open, write, and close Microsoft cabinet files."""
     def __init__(self, file: str) -> None:

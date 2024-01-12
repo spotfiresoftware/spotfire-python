@@ -51,7 +51,8 @@ cdef extern from "<wincrypt.h>" nogil:
     cdef enum:
         CERT_CLOSE_STORE_CHECK_FLAG
 
-    # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certfindcertificateinstore
+    # Function defined at
+    # https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certfindcertificateinstore
     const CERT_CONTEXT* CertFindCertificateInStore(windows.HANDLE, windows.DWORD, windows.DWORD, windows.DWORD, void*,
                                                    CERT_CONTEXT*)
 
@@ -60,8 +61,10 @@ cdef extern from "<wincrypt.h>" nogil:
         CERT_FIND_ANY
         CERT_FIND_SUBJECT_STR_W
 
-    # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetcertificatecontextproperty
+    # Function defined at
+    # https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certgetcertificatecontextproperty
     windows.BOOL CertGetCertificateContextProperty(CERT_CONTEXT*, windows.DWORD, void*, windows.DWORD*)
 
-    # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certfreecertificatecontext
+    # Function defined at
+    # https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certfreecertificatecontext
     windows.BOOL CertFreeCertificateContext(CERT_CONTEXT*)

@@ -60,7 +60,8 @@ cdef extern from "<fci.h>" nogil:
     ctypedef windows.BOOL (*PFNFCIGETTEMPFILE)(char*, int, void*)
 
     # Function defined at https://learn.microsoft.com/en-us/windows/win32/api/fci/nf-fci-fcicreate
-    cdef HFCI FCICreate(ERF*, PFNFCIFILEPLACED, PFNFCIALLOC, PFNFCIFREE, PFNFCIOPEN, PFNFCIREAD, PFNFCIWRITE, PFNFCICLOSE, PFNFCISEEK, PFNFCIDELETE, PFNFCIGETTEMPFILE, CCAB*, void*)
+    cdef HFCI FCICreate(ERF*, PFNFCIFILEPLACED, PFNFCIALLOC, PFNFCIFREE, PFNFCIOPEN, PFNFCIREAD, PFNFCIWRITE,
+                        PFNFCICLOSE, PFNFCISEEK, PFNFCIDELETE, PFNFCIGETTEMPFILE, CCAB*, void*)
 
     # Type for FCI compression types
     ctypedef unsigned short TCOMP
@@ -71,7 +72,8 @@ cdef extern from "<fci.h>" nogil:
         tcompTYPE_MSZIP
 
     # Function defined at https://learn.microsoft.com/en-us/windows/win32/api/fci/nf-fci-fciaddfile
-    cdef windows.BOOL FCIAddFile(HFCI, char*, char*, windows.BOOL, PFNFCIGETNEXTCABINET, PFNFCISTATUS, PFNFCIGETOPENINFO, TCOMP)
+    cdef windows.BOOL FCIAddFile(HFCI, char*, char*, windows.BOOL, PFNFCIGETNEXTCABINET, PFNFCISTATUS,
+                                 PFNFCIGETOPENINFO, TCOMP)
 
     # Function defined at https://learn.microsoft.com/en-us/windows/win32/api/fci/nf-fci-fciflushcabinet
     cdef windows.BOOL FCIFlushCabinet(HFCI, windows.BOOL, PFNFCIGETNEXTCABINET, PFNFCISTATUS)

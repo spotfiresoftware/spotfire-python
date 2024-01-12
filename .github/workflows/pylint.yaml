@@ -1,10 +1,10 @@
-name: Check Current PyLint
+name: Check Current Linters
 on:
   schedule:
     - cron: '17 17 * * 1'
 jobs:
-  pylint:
-    name: Check PyLint
+  lint:
+    name: Check Linters
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -14,7 +14,7 @@ jobs:
           python-version: '3.x'
       - name: Install Tools
         run: |
-          pip install PyGithub pylint
-      - name: Run PyLint
+          pip install PyGithub pylint cython-lint
+      - name: Run Analysis Tools
         run: |
-          python .github/scripts/run_pylint_check.py --token ${{ secrets.GITHUB_TOKEN }} --repo ${{ github.repository }} --label automated/pylint --src spotfire
+          python .github/scripts/run_pylint_check.py --token ${{ secrets.GITHUB_TOKEN }} --repo ${{ github.repository }} --label-pylint automated/pylint --label-cython automated/cython-lint

@@ -15,6 +15,7 @@ from vendor.windows cimport fci
 
 include "cabfile_helpers.pxi"
 
+
 @cython.auto_pickle(False)
 cdef class CabFile:
     """Class with methods to open, write, and close Microsoft cabinet files."""

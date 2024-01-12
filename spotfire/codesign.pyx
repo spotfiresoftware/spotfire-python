@@ -11,6 +11,7 @@ cpdef enum CertificateStoreLocation:
     CURRENT_USER = 1
     LOCAL_MACHINE = 2
 
+
 def codesign_file(filename, certificate, password, timestamp = None, use_rfc3161 = False, use_sha256 = False):
     """Codesign a file with the Microsoft signing API found in mssign32.dll using a certificate found in a PFX file
     or PKCS#12 container.
@@ -25,6 +26,7 @@ def codesign_file(filename, certificate, password, timestamp = None, use_rfc3161
       If ``False``, use SHA-1.
     """
     raise OSError("Codesigning not supported on non-Win32 platforms")
+
 
 def codesign_file_from_store(filename, store_location, store_name, store_cn, timestamp = None, use_rfc3161 = False,
                              use_sha256 = False):

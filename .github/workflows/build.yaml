@@ -32,7 +32,11 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: analysis-files
-          path: 'pyproject.toml'
+          path: |
+            pyproject.toml
+            **/*.pyx
+            **/*.pxd
+            **/*.pxi
       - name: Dynamic Elements
         id: dynamic
         run: |
@@ -156,7 +160,8 @@ jobs:
       - name: Install Tools
         run: |
           pip install `ls dist/*.whl`[lint]
-      - name: Static Analysis with pylint
+      - name: Run Analysis Tools
         run: |
           cd analysis
           pylint spotfire
+          cython-lint spotfire vendor

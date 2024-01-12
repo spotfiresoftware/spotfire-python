@@ -26,7 +26,7 @@ cimport numpy as np_c
 from vendor cimport sbdf_c
 
 
-### Dynamically load optional modules
+# Dynamically load optional modules
 try:
     import geopandas as gpd
     import shapely
@@ -56,16 +56,16 @@ except ImportError:
     PIL = None
 
 
-### Various utility helper functions for doing things that are problematic in PYX files
+# Various utility helper functions for doing things that are problematic in PYX files
 include "sbdf_helpers.pxi"
 
 
-### Initialize modules
+# Initialize modules
 np_c.import_array()
 datetime_c.import_datetime()
 
 
-### Exceptions raised by this module
+# Exceptions raised by this module
 class SBDFError(Exception):
     """An exception that is raised to indicate a problem during import or export of SBDF files."""
 
@@ -73,12 +73,12 @@ class SBDFError(Exception):
 cdef public object PyExc_SBDFError = <object>SBDFError
 
 
-### Warnings raised by this module
+# Warnings raised by this module
 class SBDFWarning(Warning):
     """A warning that is raised to indicate an issue during import or export of SBDF files."""
 
 
-### Utility functions and definitions for managing data types
+# Utility functions and definitions for managing data types
 cdef extern from *:
     """
     #define _USECS_PER_MSEC 1000
@@ -92,7 +92,7 @@ cdef extern from *:
 
 cdef object _timedelta_from_msec(long long msec):
     """Create a new ``timedelta`` object based on a number of milliseconds.
-    
+
     :param msec: number of milliseconds
     :return: new timedelta object
     """
@@ -115,19 +115,19 @@ cdef extern from *:
 
 cdef object _decimal_from_bytes(_SbdfDecimal* value):
     """Convert a 16-byte SBDF decimal value to a Python ``Decimal`` object.
-    
+
     :param value: SBDF decimal value
     :return: new Decimal object
     """
-    ## Coefficient
+    # Coefficient
     coefficient = 0
     cdef int i
-    for i in range(11,-1,-1):
+    for i in range(11, -1, -1):
         coefficient <<= 8
         coefficient |= value.coeff[i]
-    ## Exponent
+    # Exponent
     exponent = ((((value.exponent_high_and_sign << 8) | value.exponent_low) & 0x7FFE) >> 1) - _DECIMAL_EXPONENT_BIAS
-    ## Sign bit
+    # Sign bit
     if value.exponent_high_and_sign >> 7:
         sign = 1
     else:
@@ -144,7 +144,7 @@ cdef object _decimal_from_bytes(_SbdfDecimal* value):
 
 cdef _SbdfDecimal _decimal_to_bytes(dec: decimal.Decimal):
     """Convert a Python ``Decimal`` object to a 16-byte SBDF decimal value.
-    
+
     :param dec: Decimal object
     :return: new SBDF decimal value
     """
@@ -155,7 +155,7 @@ cdef _SbdfDecimal _decimal_to_bytes(dec: decimal.Decimal):
     dec_tuple = dec.as_tuple()
     string.memset(&out, 0, sizeof(_SbdfDecimal))
 
-    ## Coefficient
+    # Coefficient
     coefficient = 0
     for digit in dec_tuple.digits:
         coefficient *= 10
@@ -165,7 +165,7 @@ cdef _SbdfDecimal _decimal_to_bytes(dec: decimal.Decimal):
         coefficient >>= 8
     if coefficient:
         raise ValueError("too many digits in coefficient")
-    ## Exponent and sign bit
+    # Exponent and sign bit
     biased_exponent = dec_tuple.exponent + _DECIMAL_EXPONENT_BIAS
     out.exponent_low = (biased_exponent & 0x7F) << 1
     out.exponent_high_and_sign = (dec_tuple.sign << 7) | (biased_exponent >> 7)
@@ -241,7 +241,7 @@ def spotfire_typename_to_valuetype_id(typename: str):
         return None
 
 
-### Import data from SBDF into Python.
+# Import data from SBDF into Python.
 @cython.auto_pickle(False)
 cdef class _ImportContext:
     """Object to store information for each column as it is imported."""
@@ -271,9 +271,10 @@ cdef class _ImportContext:
         # Create a zero-element array for holding invalids
         self.invalid_array = np_c.PyArray_SimpleNew(1, shape, np_c.NPY_BOOL)
 
-    cdef (int, sbdf_c.sbdf_object*, sbdf_c.sbdf_object*) get_values_and_invalid(self, sbdf_c.sbdf_columnslice* col_slice):
+    cdef (int, sbdf_c.sbdf_object*, sbdf_c.sbdf_object*) get_values_and_invalid(self,
+                                                                                sbdf_c.sbdf_columnslice* col_slice):
         """Extract the values and invalid arrays from the column slice.
-        
+
         :param col_slice: the SBDF column slice to extract from
         :return: tuple containing SBDF error code, SBDF value object, and SBDF invalids object
         """
@@ -301,7 +302,7 @@ cdef class _ImportContext:
 
     cdef void cleanup_values_and_invalid(self, sbdf_c.sbdf_object* values, sbdf_c.sbdf_object* invalid):
         """Properly clean up the values and invalid arrays from the SBDF API.
-        
+
         :param values: SBDF value object to clean up
         :param invalid: SBDF invalids object to clean up
         """
@@ -311,7 +312,7 @@ cdef class _ImportContext:
 
     cdef np_c.ndarray new_slice_from_data(self, int count, void* data):
         """Create a NumPy slice ``ndarray`` from the given data.
-        
+
         :param count: the number of values in the data
         :param data: the data
         :return: new values NumPy slice array
@@ -322,7 +323,7 @@ cdef class _ImportContext:
 
     cdef np_c.ndarray new_slice_from_empty(self, int count):
         """Create a NumPy slice ``ndarray`` capable of holding the given amount of data, to be filled in later.
-        
+
         :param count: the number of values to be able to hold
         :return: new values NumPy slice array
         """
@@ -332,7 +333,7 @@ cdef class _ImportContext:
 
     cdef np_c.ndarray new_slice_from_invalid(self, int count, sbdf_c.sbdf_object* invalid):
         """Create a boolean NumPy slice ``ndarray`` from the invalid array.
-        
+
         :param count: the number of values in the data
         :param invalid: the SBDF invalids object
         :return: new invalid NumPy slice array
@@ -346,7 +347,7 @@ cdef class _ImportContext:
 
     cdef void append_values_slice(self, np_c.ndarray values_slice, np_c.ndarray invalid_slice):
         """Append the NumPy slice arrays to the full table values
-        
+
         :param values_slice: values NumPy slice array to append
         :param invalid_slice: invalid NumPy slice array to append
         """
@@ -355,14 +356,14 @@ cdef class _ImportContext:
 
     cpdef np_c.ndarray get_values_array(self):
         """Get the full table values ``ndarray``.
-        
+
         :return: the full values NumPy array
         """
         return self.values_array
 
     cpdef np_c.ndarray get_invalid_array(self):
         """Get the full table invalid ``ndarray``.
-        
+
         :return: the full invalid NumPy array
         """
         return self.invalid_array
@@ -391,7 +392,7 @@ cdef class _ImportContext:
         return _valuetype_id_to_spotfire_typename(self.value_type.id)
 
 
-## Individual functions for importing each value type.
+# Individual functions for importing each value type.
 ctypedef int(*importer_fn)(_ImportContext, sbdf_c.sbdf_columnslice*)
 
 
@@ -530,7 +531,7 @@ cdef int _import_vt_decimal(_ImportContext context, sbdf_c.sbdf_columnslice* col
 
 cdef dict _import_metadata(sbdf_c.sbdf_metadata_head* md, int column_num):
     """Process an SBDF API metadata structure into its Python equivalent.
-    
+
     :param md: SBDF metadata structure
     :param column_num: 0-based column number, or -1 for table metadata
     """
@@ -794,7 +795,7 @@ def import_data(sbdf_file):
             mem.PyMem_RawFree(importer_fns)
 
 
-### Export data to SBDF from Python.
+# Export data to SBDF from Python.
 @cython.auto_pickle(False)
 cdef class _ExportContext:
     """Object to store information for each column as it is exported."""
@@ -813,7 +814,7 @@ cdef class _ExportContext:
     cdef void set_arrays(self, np_c.ndarray values, invalid):
         """Set the NumPy ``ndarray`` with the values to export and a list or NumPy ``ndarray`` of whether each value
         is invalid.
-        
+
         :param values: full values NumPy array
         :param invalid: full invalids list or NumPy array
         """
@@ -829,15 +830,15 @@ cdef class _ExportContext:
 
     cdef void set_valuetype_id(self, valuetype_id: int):
         """Set the value type to export this column as.
-        
-        :param valuetype_id: the integer value type ID 
+
+        :param valuetype_id: the integer value type ID
         """
         self.valuetype_id = valuetype_id
 
     cpdef int get_valuetype_id(self):
         """Get the value type to export this column as.
-        
-        :return: the integer value type ID 
+
+        :return: the integer value type ID
         """
         return self.valuetype_id
 
@@ -874,10 +875,10 @@ cdef class _ExportContext:
             return None
 
 
-## Individual functions for extracting data and metadata for exporting each supported Python type.
+# Individual functions for extracting data and metadata for exporting each supported Python type.
 cdef _export_obj_dataframe(obj):
     """Extract column information for a Pandas ``DataFrame``.
-    
+
     :param obj: DataFrame object to export
     :return: tuple containing dictionary of table metadata, list of column names, list of dictionaries of column
               metadata, and list of export context objects
@@ -937,7 +938,7 @@ cdef _export_obj_dataframe(obj):
 cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metadata, column_names, column_metadata,
                                             exporter_contexts):
     """Extract column information and generate additional columns for the geometry of a GeoPandas ``GeoDataFrame``.
-    
+
     :param geometry:
     :param geometry_crs:
     :param table_metadata: dict containing table metadata
@@ -954,7 +955,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     cdef np_c.ndarray values
     cdef int i
 
-    ## Geometry
+    # Geometry
     column_names.append("Geometry")
     column_metadata.append({"MapChart.ColumnTypeId": ["Geometry"], "ContentType": ["application/x-wkb"]})
     context = _ExportContext()
@@ -965,7 +966,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     context.set_arrays(values, invalids)
     exporter_contexts.append(context)
 
-    ## XMin
+    # XMin
     column_names.append("XMin")
     column_metadata.append({"MapChart.ColumnTypeId": ["XMin"]})
     context = _ExportContext()
@@ -973,7 +974,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     context.set_arrays(geometry_bounds["minx"].to_numpy(), invalids)
     exporter_contexts.append(context)
 
-    ## XMax
+    # XMax
     column_names.append("XMax")
     column_metadata.append({"MapChart.ColumnTypeId": ["XMax"]})
     context = _ExportContext()
@@ -981,7 +982,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     context.set_arrays(geometry_bounds["maxx"].to_numpy(), invalids)
     exporter_contexts.append(context)
 
-    ## YMin
+    # YMin
     column_names.append("YMin")
     column_metadata.append({"MapChart.ColumnTypeId": ["YMin"]})
     context = _ExportContext()
@@ -989,7 +990,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     context.set_arrays(geometry_bounds["miny"].to_numpy(), invalids)
     exporter_contexts.append(context)
 
-    ## YMax
+    # YMax
     column_names.append("YMax")
     column_metadata.append({"MapChart.ColumnTypeId": ["YMax"]})
     context = _ExportContext()
@@ -997,7 +998,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     context.set_arrays(geometry_bounds["maxy"].to_numpy(), invalids)
     exporter_contexts.append(context)
 
-    ## XCenter
+    # XCenter
     column_names.append("XCenter")
     column_metadata.append({"MapChart.ColumnTypeId": ["XCenter"]})
     context = _ExportContext()
@@ -1008,7 +1009,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     context.set_arrays(values, invalids)
     exporter_contexts.append(context)
 
-    ## YCenter
+    # YCenter
     column_names.append("YCenter")
     column_metadata.append({"MapChart.ColumnTypeId": ["YCenter"]})
     context = _ExportContext()
@@ -1019,7 +1020,7 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
     context.set_arrays(values, invalids)
     exporter_contexts.append(context)
 
-    ## Table Metadata
+    # Table Metadata
     table_metadata["MapChart.IsGeocodingTable"] = [True]
     if not table_metadata.get("MapChart.IsGeocodingEnabled"):
         table_metadata["MapChart.IsGeocodingEnabled"] = [True]
@@ -1051,9 +1052,9 @@ cdef void _export_obj_geodataframe_geometry(geometry, geometry_crs, table_metada
 
 cdef _export_obj_series(obj, default_column_name):
     """Extract column information for a Pandas ``Series``.
-    
+
     :param obj: Series object to export
-    :param default_column_name: column name to use when obj does not have a name 
+    :param default_column_name: column name to use when obj does not have a name
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
               list of export context objects
     """
@@ -1082,7 +1083,7 @@ cdef _export_obj_series(obj, default_column_name):
 
 cdef _export_obj_numpy(np_c.ndarray obj, default_column_name):
     """Extract column information for a NumPy ``ndarray``.
-    
+
     :param obj: ndarray object to export
     :param default_column_name: column name to use
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
@@ -1097,7 +1098,7 @@ cdef _export_obj_numpy(np_c.ndarray obj, default_column_name):
 
 cdef _export_obj_dict_of_lists(dict obj):
     """Extract column information for a Python ``dict[str, list]``.
-    
+
     :param obj: dict object mapping strings to lists to export
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
               list of export context objects
@@ -1105,8 +1106,8 @@ cdef _export_obj_dict_of_lists(dict obj):
     cdef int i
     cdef np_c.ndarray values
 
-    for l in obj.values():
-        if not isinstance(l, list):
+    for item in obj.values():
+        if not isinstance(item, list):
             raise SBDFError("obj is not a dict of lists")
 
     # Column metadata and information
@@ -1132,7 +1133,7 @@ cdef _export_obj_dict_of_lists(dict obj):
 
 cdef _export_obj_scalar(obj, default_column_name):
     """Extract column information for a Python scalar value.
-    
+
     :param obj: scalar value to export
     :param default_column_name: column name to use
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
@@ -1149,12 +1150,12 @@ cdef _export_obj_scalar(obj, default_column_name):
 
 cdef _export_obj_iterable(obj, default_column_name):
     """Extract column information for a Python iterable object.
-    
+
     :param obj: iterable object to export
     :param default_column_name: column name to use
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
               list of export context objects
-    
+
     .. seealso: https://docs.python.org/3/glossary.html#term-iterable
     """
     cdef np_c.ndarray values
@@ -1178,7 +1179,7 @@ cdef _export_obj_iterable(obj, default_column_name):
 
 cdef _export_obj_matplotlib_figure(obj, default_column_name):
     """Extract column information for a Matplotlib ``figure``.
-    
+
     :param obj: figure object to export
     :param default_column_name: column name to use
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
@@ -1199,7 +1200,7 @@ cdef _export_obj_matplotlib_figure(obj, default_column_name):
 
 cdef _export_obj_seaborn_grid(obj, default_column_name):
     """Extract column information for a Seaborn ``Grid``.
-    
+
     :param obj: grid object to export
     :param default_column_name: column name to use
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
@@ -1219,7 +1220,7 @@ cdef _export_obj_seaborn_grid(obj, default_column_name):
 
 cdef _export_obj_pil_image(obj, default_column_name):
     """Extract column information for a PIL ``Image``.
-    
+
     :param obj: image object to export
     :param default_column_name: column name to use
     :return: tuple containing dict of table metadata, list of column names, list of dicts of column metadata, and
@@ -1239,7 +1240,7 @@ cdef _export_obj_pil_image(obj, default_column_name):
 
 cdef np_c.ndarray _export_infer_invalids(values):
     """Infer invalid array information from values.
-    
+
     :param values: values to infer invalids from
     :return: invalids NumPy array
     """
@@ -1253,13 +1254,13 @@ cdef np_c.ndarray _export_infer_invalids(values):
     return invalids
 
 
-## Individual functions for exporting each Spotfire value type.
+# Individual functions for exporting each Spotfire value type.
 ctypedef int(*exporter_fn)(_ExportContext, Py_ssize_t, Py_ssize_t, sbdf_c.sbdf_object**)
 
 
 cdef exporter_fn _export_get_exporter(int valuetype_id):
     """Get the right exporter function for a value type.
-    
+
     :param valuetype_id: the integer value type id
     :return: the exporter function
     """
@@ -1473,7 +1474,7 @@ cdef int _export_vt_decimal(_ExportContext context, Py_ssize_t start, Py_ssize_t
 
 cdef bint _export_infer_int_promotion(values, values_description):
     """Determine if values can be promoted from Integer type to LongInteger.
-    
+
     :param values: the values to check for promotion
     :param values_description: description of values (for error reporting)
     :return: whether the values can be promoted
@@ -1488,7 +1489,7 @@ cdef bint _export_infer_int_promotion(values, values_description):
 
 cdef int _export_infer_valuetype_from_type(values, values_description):
     """Determine a value type for a data set based on the Python type of the objects in the values list.
-    
+
     :param values: the values to infer the value type of
     :param values_description: description of values (for error reporting)
     :return: the integer value type id representing the type of values
@@ -1552,7 +1553,7 @@ cdef int _export_infer_valuetype_from_type(values, values_description):
 
 cdef int _export_infer_valuetype_from_pandas_dtype(series, series_description):
     """Determine a value type for a data set based on the Pandas dtype for the series.
-    
+
     :param series: the values to infer the value type of
     :param series_description: description of series (for error reporting)
     :return: the integer value type id representing the type of series
@@ -1600,7 +1601,7 @@ cdef object _VT_CONVERSIONS_NUMERIC = [sbdf_c.SBDF_BOOLTYPEID, sbdf_c.SBDF_INTTY
 
 cdef int _export_infer_valuetype_from_spotfire_typename(series, series_description):
     """Determine a value type for a data set based on the name of the Spotfire type.
-    
+
     :param series: the values to infer the value type of
     :param series_description: description of series (for error reporting)
     :return: the integer value type id representing the type of series
@@ -1641,7 +1642,7 @@ cdef int _export_infer_valuetype_from_spotfire_typename(series, series_descripti
 
 cdef int _export_get_value_encoding(int valuetype_id, bint encoding_rle):
     """Determine the correct SBDF encoding to use for a column.
-    
+
     :param valuetype_id: the integer value type id of the column
     :param encoding_rle: whether RLE encoding was requested by the caller of export_data
     :return: the integer SBDF encoding constant for the column
@@ -1658,12 +1659,12 @@ cdef (int, sbdf_c.sbdf_valuearray*) _export_process_invalid_array(_ExportContext
                                                                   Py_ssize_t start, Py_ssize_t count,
                                                                   sbdf_c.sbdf_columnslice* col_slice):
     """Process the invalid array into SBDF API structures.
-    
+
     :param context: the export context containing information about the column
     :param start: the index of the first row in the column slice to create
     :param count: the number of rows in the column slice to create
     :param col_slice: the SBDF column slice to add the invalid array to
-    :return: Cython C-tuple containing SBDF error code and created SBDF value array  
+    :return: Cython C-tuple containing SBDF error code and created SBDF value array
     """
     cdef sbdf_c.sbdf_object* invalids = NULL
     cdef sbdf_c.sbdf_valuearray* invalid_array = NULL
@@ -1687,7 +1688,7 @@ cdef (int, sbdf_c.sbdf_valuearray*) _export_process_invalid_array(_ExportContext
 
 cdef inline void* _export_get_offset_ptr(np_c.ndarray array, Py_ssize_t start, Py_ssize_t count):
     """Slice a NumPy ``ndarray`` using Cython memoryviews.
-    
+
     :param array: the NumPy array to slice
     :param start: the index of the first element of the slice
     :param count: the number of elements to include in the slice
@@ -1699,7 +1700,7 @@ cdef inline void* _export_get_offset_ptr(np_c.ndarray array, Py_ssize_t start, P
 
 cdef sbdf_c.sbdf_metadata_head* _export_metadata(dict md, int column_num):
     """Process a Python metadata representation into its SBDF API equivalent
-    
+
     :param md: dictionary containing table or column metadata
     :param column_num: 0-based column number, or -1 for table metadata (for error reporting)
     :return: SBDF metadata structure
@@ -1710,14 +1711,12 @@ cdef sbdf_c.sbdf_metadata_head* _export_metadata(dict md, int column_num):
     cdef int val_len
     cdef sbdf_c.sbdf_valuetype val_type
     cdef int* data_lengths = NULL
-    cdef char** data_string
     cdef double* data_double
     cdef long* data_long
     cdef float* data_float
     cdef int* data_int
     cdef unsigned char* data_bool
     cdef long long* data_datetime
-    cdef unsigned char** data_bytes
     cdef _SbdfDecimal* data_decimal
 
     error = sbdf_c.sbdf_md_create(&md_head)
@@ -1841,7 +1840,6 @@ def export_data(obj, sbdf_file, default_column_name="x", Py_ssize_t rows_per_sli
     cdef sbdf_c.sbdf_valuetype col_vt
     cdef Py_ssize_t row_count = 0
     cdef Py_ssize_t row_offset = 0
-    cdef Py_ssize_t slice_row_count
     cdef _AllocatedList saved_value_arrays
     cdef _AllocatedList saved_col_slices
     cdef sbdf_c.sbdf_tableslice* table_slice = NULL
@@ -1854,34 +1852,34 @@ def export_data(obj, sbdf_file, default_column_name="x", Py_ssize_t rows_per_sli
 
     try:
         # Extract data and metadata from obj
-        ## Pandas DataFrames (tabular)
+        # Pandas DataFrames (tabular)
         if isinstance(obj, pd.DataFrame):
             exported = _export_obj_dataframe(obj)
-        ## Pandas Series (columnar)
+        # Pandas Series (columnar)
         elif isinstance(obj, pd.Series):
             exported = _export_obj_series(obj, default_column_name)
-        ## NumPy Array (columnar)
+        # NumPy Array (columnar)
         elif isinstance(obj, np_c.ndarray):
             exported = _export_obj_numpy(obj, default_column_name)
-        ## Dicts of Lists (tabular)
+        # Dicts of Lists (tabular)
         elif isinstance(obj, dict):
             exported = _export_obj_dict_of_lists(obj)
-        ## Strings and Bytes (scalar)
+        # Strings and Bytes (scalar)
         elif isinstance(obj, (str, bytes, bytearray)):
             exported = _export_obj_scalar(obj, default_column_name)
-        ## Iterable (columnar)
+        # Iterable (columnar)
         elif isinstance(obj, collections.abc.Iterable):
             exported = _export_obj_iterable(obj, default_column_name)
-        ## Matplotlib Figures (scalar)
+        # Matplotlib Figures (scalar)
         elif matplotlib is not None and isinstance(obj, matplotlib.figure.Figure):
             exported = _export_obj_matplotlib_figure(obj, default_column_name)
-        ## Seaborn Grids (scalar)
+        # Seaborn Grids (scalar)
         elif seaborn is not None and isinstance(obj, seaborn.axisgrid.Grid):
             exported = _export_obj_seaborn_grid(obj, default_column_name)
-        ## PIL Images (scalar)
+        # PIL Images (scalar)
         elif PIL is not None and isinstance(obj, PIL.Image.Image):
             exported = _export_obj_pil_image(obj, default_column_name)
-        ## Try if all else fails (scalar)
+        # Try if all else fails (scalar)
         else:
             exported = _export_obj_scalar(obj, default_column_name)
         table_metadata, column_names, column_metadata, exporter_contexts = exported

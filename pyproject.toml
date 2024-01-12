@@ -62,6 +62,7 @@ dev = [
 # Static analysis requirements
 lint = [
     "pylint == 3.0.3",
+    "cython-lint == 0.16.0",
 ]
 
 [tool.pylint.main]
@@ -262,3 +263,6 @@ dummy-variables-rgx = "_+$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$)|dummy|^ignored_|^unuse
 ignored-argument-names = "_.*|^ignored_|^unused_"
 # init-import =
 redefining-builtins-modules = ["six.moves", "future.builtins"]
+
+[tool.cython-lint]
+max-line-length = 120
