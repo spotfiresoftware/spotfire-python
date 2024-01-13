@@ -37,6 +37,7 @@ jobs:
             **/*.pyx
             **/*.pxd
             **/*.pxi
+            spotfire/*_helpers.*
       - name: Dynamic Elements
         id: dynamic
         run: |
@@ -167,3 +168,4 @@ jobs:
           pylint spotfire
           mv .save/* . && rmdir .save
           cython-lint spotfire vendor
+          find spotfire -name '*_helpers.[ch]' | xargs cpplint

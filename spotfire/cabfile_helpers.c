@@ -4,6 +4,8 @@
 
 #include <Python.h>
 
+#include "cabfile_helpers.h"
+
 #ifdef _WIN32
 
 #include <windows.h>
@@ -16,8 +18,7 @@ static wchar_t *_fci_convert_utf_to_wide(const char *utf, int *err) {
     if (obj == NULL) {
         if (PyErr_ExceptionMatches(PyExc_MemoryError)) {
             *err = ENOMEM;
-        }
-        else {
+        } else {
             *err = EINVAL;
         }
         PyErr_Clear();
@@ -75,7 +76,7 @@ FNFCICLOSE(_fci_cb_close) {
 }
 
 FNFCISEEK(_fci_cb_seek) {
-    long result = (long)_lseek((int)hf, dist, seektype);
+    long result = (long)_lseek((int)hf, dist, seektype);  /* NOLINT(runtime/int) */
     if (result == -1)
         *err = errno;
     return result;
@@ -100,7 +101,7 @@ FNFCIFILEPLACED(_fci_cb_file_placed) {
 FNFCIGETTEMPFILE(_fci_cb_get_temp_file) {
     char *name = _tempnam("", "cabtmp");
     if ((name != NULL) && ((int)strlen(name) < cbTempName)) {
-        strcpy(pszTempName, name);
+        strncpy(pszTempName, name, cbTempName);
         free(name);
         return TRUE;
     }
@@ -130,7 +131,7 @@ FNFCIGETOPENINFO(_fci_cb_get_open_info) {
         return -1;
     }
     FILETIME ft;
-    if(GetFileTime(handle, NULL, NULL, &ft) == FALSE) {
+    if (GetFileTime(handle, NULL, NULL, &ft) == FALSE) {
         CloseHandle(handle);
         PyMem_Free(wide);
         return -1;

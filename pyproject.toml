@@ -63,6 +63,7 @@ dev = [
 lint = [
     "pylint == 3.0.3",
     "cython-lint == 0.16.0",
+    "cpplint == 1.6.1",
 ]
 
 [tool.pylint.main]

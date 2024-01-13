@@ -1,8 +1,10 @@
 # pylint: skip-file
 
 import argparse
+import glob
 import io
 import os
+import subprocess
 import sys
 
 from github import Github
@@ -10,6 +12,7 @@ from pylint import lint as pl_run
 from pylint.__pkginfo__ import __version__ as pl_version
 from cython_lint import cython_lint as cl_run
 from cython_lint import __version__ as cl_version
+from cpplint import __VERSION__ as cp_version
 
 
 def main():
@@ -18,18 +21,17 @@ def main():
         "Check if any opened issues have been closed, run linters, and open an issue if any complain")
     parser.add_argument("--token", help="The GitHub API token to use")
     parser.add_argument("--repo", help="The owner and repository we are operating on")
-    parser.add_argument("--label-pylint", help="The name of the GitHub label for 'pylint' generated issues")
-    parser.add_argument("--label-cython", help="The name of the GitHub label for 'cython-lint' generated issues")
     args = parser.parse_args()
     # Connect to GitHub REST API
     gh = Github(args.token)
     # Run the linters
-    pylint(gh, args.repo, args.label_pylint)
-    cython_lint(gh, args.repo, args.label_cython)
+    pylint(gh, args.repo)
+    cython_lint(gh, args.repo)
+    cpplint(gh, args.repo)
 
 
-def _check_issues(gh, repo, tool, label):
-    open_issues = gh.search_issues(f"repo:{repo} label:{label} is:issue is:open")
+def _check_issues(gh, repo, tool):
+    open_issues = gh.search_issues(f"repo:{repo} label:automated/{tool} is:issue is:open")
     if open_issues.totalCount != 0:
         print(f"Skipping '{tool}' run due to existing issue {open_issues[0].html_url}.")
         return True
@@ -37,7 +39,7 @@ def _check_issues(gh, repo, tool, label):
         return False
 
 
-def _file_issue(gh, repo, tool, tool_args, tool_version, label, output):
+def _file_issue(gh, repo, tool, tool_args, tool_version, output):
     issue_title = f"New version of pylint ({tool_version}) identifies new issues"
     issue_body = (f"A version of `{tool}` is available in the Python package repositories that identifies issues "
                   f"with the `spotfire` package.  Since we attempt to keep all lint issues out of the source "
@@ -45,7 +47,7 @@ def _file_issue(gh, repo, tool, tool_args, tool_version, label, output):
                   f"comment), this is indicative of a new check in this new version of `{tool}`.\n\n"
                   f"Please investigate these issues, and either fix the source or disable the check with a "
                   f"comment.  Further checks by this automation will be held until this issue is closed.  Make "
-                  f"sure that the fix updates the `{tool}` requirement in `requirements_lint.txt` to the version "
+                  f"sure that the fix updates the `{tool}` requirement in `pyproject.toml` to the version "
                   f"identified here ({tool_version}).\n\n"
                   f"For reference, here is the output of this version of `{tool}`:\n\n"
                   f"```\n"
@@ -54,7 +56,7 @@ def _file_issue(gh, repo, tool, tool_args, tool_version, label, output):
                   f"```\n\n"
                   f"*This issue was automatically opened by the `pylint.yaml` workflow.*\n")
     repo = gh.get_repo(repo)
-    repo_label = repo.get_label(label)
+    repo_label = repo.get_label(f"automated/{tool}")
     new_issue = repo.create_issue(title=issue_title, body=issue_body, labels=[repo_label])
     print(f"Opened issue {new_issue.html_url}")
 
@@ -76,9 +78,9 @@ class _StdoutCapture:
         return self._capture.getvalue()
 
 
-def pylint(gh, repo, label):
+def pylint(gh, repo):
     # Determine if we should run pylint
-    if _check_issues(gh, repo, "pylint", label):
+    if _check_issues(gh, repo, "pylint"):
         return
 
     # Now run pylint
@@ -88,12 +90,12 @@ def pylint(gh, repo, label):
         return
 
     # File an issue
-    _file_issue(gh, repo, "pylint", "spotfire", pl_version, label, capture.output())
+    _file_issue(gh, repo, "pylint", "spotfire", pl_version, capture.output())
 
 
-def cython_lint(gh, repo, label):
+def cython_lint(gh, repo):
     # Determine if we should run cython-lint
-    if _check_issues(gh, repo, "cython-lint", label):
+    if _check_issues(gh, repo, "cython-lint"):
         return
 
     # Now run cython-lint
@@ -103,7 +105,23 @@ def cython_lint(gh, repo, label):
         return
 
     # File an issue
-    _file_issue(gh, repo, "cython-lint", "spotfire vendor", cl_version, label, capture.output())
+    _file_issue(gh, repo, "cython-lint", "spotfire vendor", cl_version, capture.output())
+
+
+def cpplint(gh, repo):
+    # Determine if we should run cpplint
+    if _check_issues(gh, repo, "cpplint"):
+        return
+
+    # Now run cpplint
+    command = [sys.executable, "-m", "cpplint"]
+    command.extend(glob.glob("spotfire/*_helpers.[ch]"))
+    result = subprocess.run(command, capture_output=True, check=False)
+    if not result.returncode:
+        return
+
+    # File an issue
+    _file_issue(gh, repo, "cpplint", "spotfire/*_helpers.[ch]", cp_version, result.stdout.decode("utf-8"))
 
 
 if __name__ == "__main__":

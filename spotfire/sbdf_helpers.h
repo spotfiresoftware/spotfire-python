@@ -2,6 +2,9 @@
    This file is subject to the license terms contained
    in the license file that is distributed with this file. */
 
+#ifndef SPOTFIRE_SBDF_HELPERS_H_
+#define SPOTFIRE_SBDF_HELPERS_H_
+
 #include <Python.h>
 #include <stdio.h>
 #include <all.h>
@@ -35,3 +38,5 @@ struct _SbdfDecimal {
 /* Utility functions for extracting strings from Python ``Union[str,bytes]`` into C */
 extern sbdf_object *_export_extract_string_obj(PyObject *vals, PyObject *invalids, Py_ssize_t start, Py_ssize_t count);
 extern sbdf_object *_export_extract_binary_obj(PyObject *vals, PyObject *invalids, Py_ssize_t start, Py_ssize_t count);
+
+#endif /* SPOTFIRE_SBDF_HELPERS_H_ */
