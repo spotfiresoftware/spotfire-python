@@ -169,4 +169,4 @@ jobs:
           pylint spotfire
           mv .save/* . && rmdir .save
           cython-lint spotfire vendor
-          find spotfire -name '*_helpers.[ch]' | xargs cpplint
+          find spotfire -name '*_helpers.[ch]' | xargs cpplint --repository=.
