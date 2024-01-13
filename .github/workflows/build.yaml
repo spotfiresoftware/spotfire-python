@@ -34,6 +34,7 @@ jobs:
           name: analysis-files
           path: |
             pyproject.toml
+            CPPLINT.cfg
             **/*.pyx
             **/*.pxd
             **/*.pxi
