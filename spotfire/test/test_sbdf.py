@@ -4,6 +4,7 @@ import datetime
 import decimal
 import unittest
 import tempfile
+import typing
 
 import pandas as pd
 import pandas.testing as pdtest
@@ -353,10 +354,11 @@ class SbdfTest(unittest.TestCase):
         default_type = None
         pass_types = ["String", "DateTime", "Date", "Time", "TimeSpan", "Binary", "Currency",
                       "Boolean", "Integer", "LongInteger", "SingleReal", "Real"]
-        fail_types = []
+        fail_types: typing.List[str] = []
         self._verify_import_export_types(data, default_type, pass_types, fail_types)
 
-    def _verify_import_export_types(self, data, default_type, pass_types, fail_types):
+    def _verify_import_export_types(self, data, default_type: typing.Optional[str], pass_types: typing.List[str],
+                                    fail_types: typing.List[str]):
         """Helper function that takes a column of data and round trips export/import
            and verifies that the data is the expected type."""
         self.assertEqual(len(pass_types) + len(fail_types), 12,
@@ -454,19 +456,19 @@ class SbdfTest(unittest.TestCase):
         self._assert_is_png_image(val)
 
     @staticmethod
-    def _roundtrip_dataframe(dataframe):
+    def _roundtrip_dataframe(dataframe: typing.Any) -> pd.DataFrame:
         """Write out a dataframe to SBDF and immediately read it back in to a new one."""
         with tempfile.TemporaryDirectory() as tempdir:
             sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
             return sbdf.import_data(f"{tempdir}/output.sbdf")
 
-    def _assert_dataframe_shape(self, dataframe, rows, column_names):
+    def _assert_dataframe_shape(self, dataframe: pd.DataFrame, rows: int, column_names: typing.List[str]) -> None:
         """Assert that a dataframe has a specific number of rows and the given column names."""
         self.assertEqual(len(dataframe), rows, msg="number of rows")
         self.assertEqual(len(dataframe.columns), len(column_names), msg="number of columns")
         for i, col in enumerate(column_names):
             self.assertEqual(dataframe.columns[i], col, msg=f"column #{i} name")
 
-    def _assert_is_png_image(self, expr):
+    def _assert_is_png_image(self, expr: bytes) -> None:
         """Assert that a bytes object represents PNG image data."""
         self.assertEqual(expr[0:8], b'\x89PNG\x0d\x0a\x1a\x0a')

@@ -53,7 +53,7 @@ class DataFunctionTest(unittest.TestCase):
                 if inputs[k] is None:
                     in_type = "NULL"
                     print(f"test: missing input '{k}' ")
-                    input_spec.append(datafn.AnalyticInput(k, in_type, None))
+                    input_spec.append(datafn.AnalyticInput(k, in_type, ""))
                     continue
                 if isinstance(inputs[k], pd.DataFrame):
                     in_type = "table"
@@ -86,7 +86,7 @@ class DataFunctionTest(unittest.TestCase):
             if actual_result._debug_log:
                 print(actual_result._debug_log)
             actual_result._debug_log = None
-            actual_result_str = actual_result.summary
+            actual_result_str = actual_result.summary if actual_result.summary else ""
             if actual_result_str:
                 print("test: --- start actual output ---")
                 print(actual_result_str)

@@ -9,6 +9,7 @@ import os.path
 import pprint
 import sys
 import traceback
+import types
 import typing
 import re
 
@@ -23,6 +24,9 @@ def _bad_string(str_: typing.Any) -> bool:
 
 
 class _OutputCapture:
+    _old_stdout: typing.Optional[typing.TextIO]
+    _old_stderr: typing.Optional[typing.TextIO]
+
     def __init__(self) -> None:
         self._entered = False
         self._stdout = io.StringIO()
@@ -44,8 +48,10 @@ class _OutputCapture:
         if not self._entered:
             raise ValueError("cannot exit unentered output capture")
         self._entered = False
-        sys.stdout = self._old_stdout
-        sys.stderr = self._old_stderr
+        if self._old_stdout:
+            sys.stdout = self._old_stdout
+        if self._old_stderr:
+            sys.stderr = self._old_stderr
         self._old_stdout = None
         self._old_stderr = None
 
@@ -181,17 +187,24 @@ class AnalyticOutput:
 
 class AnalyticResult:
     """Represents the results of evaluating an AnalyticSpec object."""
+    std_err_out: typing.Optional[str]
+    summary: typing.Optional[str]
+    _exc_info: typing.Tuple[typing.Optional[typing.Type[BaseException]], typing.Optional[BaseException],
+                            typing.Optional[types.TracebackType]]
+    _debug_log: typing.Optional[str]
 
-    def __init__(self) -> None:
+    def __init__(self, capture: _OutputCapture) -> None:
         self.success = True
         self.has_stderr = False
         self.std_err_out = None
         self.summary = None
-        self._exc_info = (type(None), None, None)
-        self._capture = None
+        self._exc_info = (None, None, None)
+        self._capture = capture
         self._debug_log = None
 
-    def fail_with_exception(self, exc_info) -> None:
+    def fail_with_exception(self, exc_info: typing.Tuple[typing.Optional[typing.Type[BaseException]],
+                                                         typing.Optional[BaseException],
+                                                         typing.Optional[types.TracebackType]]) -> None:
         """Set this result as failed with an exception."""
         self.fail()
         self._exc_info = exc_info
@@ -199,10 +212,6 @@ class AnalyticResult:
     def fail(self) -> None:
         """Set the result to Failed."""
         self.success = False
-
-    def set_capture(self, capture: _OutputCapture) -> None:
-        """Set the captured standard output and error of this result."""
-        self._capture = capture
 
     def get_capture(self) -> _OutputCapture:
         """Get the captured standard output and error of this result."""
@@ -212,11 +221,12 @@ class AnalyticResult:
         """Set the debug log that generated this result."""
         self._debug_log = log
 
-    def get_debug_log(self) -> str:
+    def get_debug_log(self) -> typing.Optional[str]:
         """Get the debug log for this result."""
         return self._debug_log
 
-    def get_exc_info(self):
+    def get_exc_info(self) -> typing.Tuple[typing.Optional[typing.Type[BaseException]], typing.Optional[BaseException],
+                                           typing.Optional[types.TracebackType]]:
         """Get the exception information."""
         return self._exc_info
 
@@ -224,6 +234,7 @@ class AnalyticResult:
 class AnalyticSpec:
     """Represents an analytic spec used to process a data function."""
     # pylint: disable=too-many-instance-attributes
+    compiled_script: typing.Optional[types.CodeType]
 
     def __init__(self, analytic_type: str, inputs: typing.List[AnalyticInput], outputs: typing.List[AnalyticOutput],
                  script: str) -> None:
@@ -273,12 +284,11 @@ class AnalyticSpec:
         function raised any errors
         """
         self.debug("start evaluate")
-        result = AnalyticResult()
 
         # noinspection PyBroadException
         try:
             with _OutputCapture() as capture:
-                result.set_capture(capture)
+                result = AnalyticResult(capture)
 
                 # parse and compile the script first
                 self._compile_script(result)
@@ -291,7 +301,8 @@ class AnalyticSpec:
                     return self._summarize(result)
 
                 # execute the script
-                self._execute_script(self.compiled_script, result)
+                if self.compiled_script:
+                    self._execute_script(self.compiled_script, result)
                 if not result.success:
                     return self._summarize(result)
 
@@ -348,7 +359,7 @@ class AnalyticSpec:
         self.debug(f"done reading {len(self.inputs)} input variables")
         return
 
-    def _execute_script(self, compiled_script: typing.Any, result: AnalyticResult) -> None:
+    def _execute_script(self, compiled_script: types.CodeType, result: AnalyticResult) -> None:
         """execute the script"""
         # pylint: disable=exec-used
         self.debug("executing script")
@@ -405,15 +416,14 @@ class AnalyticSpec:
         try:
             if not result.success:
                 buf.write("Error executing Python script:\n\n")
-                if result.get_exc_info()[2] is not None:
+                exc_info = result.get_exc_info()
+                if exc_info[0] and exc_info[1] and exc_info[2]:
                     # noinspection PyBroadException
                     try:
                         # If it was a syntax error, show the text with the caret
-                        exc_type = _utils.type_name(result.get_exc_info()[0])
+                        exc_type = _utils.type_name(exc_info[0])
                         if exc_type in ("SyntaxError", "IndentationError", "TabError"):
-                            syntax_error = traceback.TracebackException(result.get_exc_info()[0],
-                                                                        result.get_exc_info()[1],
-                                                                        result.get_exc_info()[2])
+                            syntax_error = traceback.TracebackException(exc_info[0], exc_info[1], exc_info[2])
                             buf.write(f'  File "{syntax_error.filename}", line {syntax_error.lineno}\n')
                             buf.write(f"    {syntax_error.text}")
                             # sometimes the offset is wrong, placing the caret before or after the text.
@@ -424,24 +434,25 @@ class AnalyticSpec:
                                 spacer -= 1
                             offset = " " * spacer
                             buf.write(f"    {offset}^\n")
-                        buf.write(f"{exc_type}: {result.get_exc_info()[1]}\n\n")
-                        self._create_traceback(buf, result.get_exc_info()[1])
+                        buf.write(f"{exc_type}: {exc_info[1]}\n\n")
+                        self._create_traceback(buf, exc_info[1])
                     except BaseException:
-                        buf.write(f"\nCould not retrieve stacktrace: {traceback.print_exc()}")
+                        buf.write(f"\nCould not retrieve stacktrace: {traceback.format_exc()}")
             if result.get_capture() is not None:
                 out = result.get_capture().get_stdout()
-                if out is not None:
+                if out:
                     buf.write("\nStandard output:\n")
                     buf.write(out)
                 result.std_err_out = result.get_capture().get_stderr()
-                if result.std_err_out is not None:
+                if result.std_err_out:
                     result.has_stderr = True
                     buf.write("\nStandard error:\n")
                     buf.write(result.std_err_out)
             if self.debug_enabled:
-                if result.get_debug_log() is not None:
+                debug_log = result.get_debug_log()
+                if debug_log:
                     buf.write("\nDebug log:\n")
-                    buf.write(result.get_debug_log())
+                    buf.write(debug_log)
         except SystemError as err:
             buf.write(str(err))
         result.summary = buf.getvalue()

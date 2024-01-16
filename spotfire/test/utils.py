@@ -5,7 +5,7 @@ import inspect
 import os
 
 
-def get_test_data_file(name):
+def get_test_data_file(name: str) -> str:
     """Determine the filename of a test data file.  It is possible for the data files to be separated from the
     ``spotfire.test.files`` package, especially for testing binary wheels in the CI environment; to look in an
     alternate location, set the ``TEST_FILES_DIR`` environment variable.
@@ -14,8 +14,5 @@ def get_test_data_file(name):
     :return: the full filename of the test file
     """
     test_dir, _ = os.path.split(inspect.stack()[1].filename)
-    if "TEST_FILES_DIR" in os.environ:
-        files_dir = os.getenv("TEST_FILES_DIR")
-    else:
-        files_dir = os.path.join(test_dir, "files")
+    files_dir = os.getenv("TEST_FILES_DIR", os.path.join(test_dir, "files"))
     return os.path.join(files_dir, name)

@@ -60,8 +60,14 @@ dev = [
     "html-testRunner",
 ]
 # Static analysis requirements
+types = [
+    "pandas-stubs",
+    "types-Pillow",
+    "types-seaborn",
+]
 lint = [
     "pylint == 3.0.3",
+    "mypy == 1.8.0", "spotfire[types]",
     "cython-lint == 0.16.0",
     "cpplint == 1.6.1",
 ]
@@ -267,3 +273,14 @@ redefining-builtins-modules = ["six.moves", "future.builtins"]
 
 [tool.cython-lint]
 max-line-length = 120
+
+[tool.mypy]
+check_untyped_defs = true
+plugins = ["numpy.typing.mypy_plugin"]
+
+[[tool.mypy.overrides]]
+module = [
+    "geopandas",
+    "HtmlTestRunner",
+]
+ignore_missing_imports = true

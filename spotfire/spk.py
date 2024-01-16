@@ -217,13 +217,18 @@ def _read_brand(filename: str, comment: str) -> typing.Dict:
 
 class _PackageBuilder(metaclass=abc.ABCMeta):
     # pylint: disable=too-many-instance-attributes
+    excludes: typing.List[str]
+    _contents: typing.List[typing.Tuple[str, str]]
+    _cleanup_dirs: typing.List[str]
+    _cleanup_files: typing.List[str]
+
     def __init__(self) -> None:
-        self.name = None
-        self.version = None
-        self.id = None
-        self.output = None
+        self.name = ""
+        self.version = _SpkVersion()
+        self.id = ""
+        self.output = ""
         self.excludes = []
-        self.last_scan_dir = None
+        self.last_scan_dir = ""
         self._contents = []
         self._cleanup_dirs = []
         self._cleanup_files = []
@@ -251,6 +256,14 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 if archive_backslash.startswith(exclude):
                     return
         self._contents.append((filename, archive_backslash))
+
+    @abc.abstractmethod
+    def add_resource(self, name: str, location: str) -> None:
+        """Add a public resource provided by this package.
+
+        :param name: name of the resource to add to this package
+        :param location: the location within the package the resource refers to
+        """
 
     def scan_python_installation(self, prefix: str) -> None:
         """Scan all the files in the Python installation.
@@ -419,7 +432,8 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         _message("Completed removing files and directories for packages on the deny list.")
         return package_versions
 
-    def _process_package_requirements(self, requirement, extra: str = None, seen: typing.Set[str] = None) -> None:
+    def _process_package_requirements(self, requirement, extra: typing.Optional[str] = None,
+                                      seen: typing.Optional[typing.Set[str]] = None) -> None:
         """Process the child requirements of a requirement object."""
         # Do not process if the requested extra is not part of the current requirement.
         if requirement.marker and not requirement.marker.evaluate({"extra": extra}):
@@ -445,14 +459,14 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     for child_extra in child_req.extras:
                         self._process_package_requirements(child_req, child_extra, seen)
 
-    def requirements_of(self, package: str, extra: str = None) -> typing.Set[str]:
+    def requirements_of(self, package: str, extra: typing.Optional[str] = None) -> typing.Set[str]:
         """Determine the requirements recursively of a package.
 
         :param package: the name of the package
         :param extra: the extra for the package
         :returns: set of package names that are recursively as requirements of the package
         """
-        packages_seen = set()
+        packages_seen: typing.Set[str] = set()
         self._process_package_requirements(pkg_req.Requirement(package), extra, packages_seen)
         return packages_seen
 
@@ -462,7 +476,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :param requirements: the text contents of the requirements to recursively determine
         :returns: set of package names that are recursively included by the requirements file
         """
-        packages_seen = set()
+        packages_seen: typing.Set[str] = set()
         for line in requirements.splitlines():
             line = re.sub('#.*$', '', line)
             line = line.strip()
@@ -475,8 +489,9 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         """Remove all files in this distribution.  Note that after this method returns, the distribution object does
         not contain any valid information since the backing metadata has been removed."""
         to_delete = set()
-        for file in dist.files:
-            to_delete.add(str(file.locate()))
+        if dist.files:
+            for file in dist.files:
+                to_delete.add(str(file.locate()))
 
         name = dist.name
         version = dist.version
@@ -607,6 +622,14 @@ class _ZipPackageBuilder(_PackageBuilder):
         """Get the payload archive name for this package."""
         return f"{self.name}.zip"
 
+    def add_resource(self, name: str, location: str) -> None:
+        """Add a public resource provided by this package.
+
+        :param name: name of the resource to add to this package
+        :param location: the location within the package the resource refers to
+        """
+        raise NotImplementedError
+
     def _create_module(self) -> ElementTree.Element:
         """Create the module document."""
         module = super()._create_module()
@@ -628,7 +651,9 @@ class _ZipPackageBuilder(_PackageBuilder):
     def _build_payload(self, metadata: ElementTree.Element, module: ElementTree.Element, payload_dest: str) -> None:
         """Build the main payload archive for the SPK package."""
         metadata_files = metadata.find("Files")
-        payload_script = []
+        if not metadata_files:
+            raise RuntimeError("no <Files> element found")
+        payload_script: typing.List[str] = []
         with zipfile.ZipFile(payload_dest, "w", compression=zipfile.ZIP_DEFLATED) as payload:
             # Add all files that are supposed to go into the package
             for filename_ondisk, filename_payload in self._contents:
@@ -711,6 +736,8 @@ class _CabPackageBuilder(_PackageBuilder):
         # pylint: disable=import-outside-toplevel
         from spotfire import cabfile, codesign
         metadata_files = metadata.find("Files")
+        if not metadata_files:
+            raise RuntimeError("no <Files> element found")
 
         with cabfile.CabFile(payload_dest) as payload:
             # Add all files that are supposed to go into the package
@@ -729,9 +756,9 @@ class _CabPackageBuilder(_PackageBuilder):
         # Codesign the payload
         if self.cert_store_name and self.cert_store_cn:
             if self.cert_store_machine:
-                store_location = codesign.LOCAL_MACHINE
+                store_location = codesign.CertificateStoreLocation.LOCAL_MACHINE
             else:
-                store_location = codesign.CURRENT_USER
+                store_location = codesign.CertificateStoreLocation.CURRENT_USER
             codesign.codesign_file_from_store(payload_dest, store_location, self.cert_store_name, self.cert_store_cn,
                                               self.timestamp_url, self.sha256, self.sha256)
         elif self.cert_file:
@@ -777,6 +804,7 @@ def python(args, hook=None) -> None:
 
     # Set up the package builder
     analyst = getattr(args, "analyst")
+    package_builder: _PackageBuilder
     if analyst:
         package_builder = _CabPackageBuilder()
         package_builder.excludes = getattr(args, "exclude")
@@ -795,7 +823,7 @@ def python(args, hook=None) -> None:
         package_builder.id = {
             "Windows": "b95fbe51-c013-4f65-8523-5bffcf19e6a8",
             "Linux": "6692a2c3-d43d-4224-a8db-26619ae8f268",
-        }.get(platform.system())
+        }.get(platform.system(), "")
         package_builder.name = f"Python Interpreter {platform.system()}"
 
     # Get the version of the Python installation
@@ -816,8 +844,10 @@ def python(args, hook=None) -> None:
     try:
         with tempfile.NamedTemporaryFile(mode="wt", prefix="req", suffix=".txt", encoding="utf-8",
                                          delete=False) as spotfire_requirements:
-            for req in imp_md.requires("spotfire"):
-                print(req, file=spotfire_requirements)
+            requires = imp_md.requires("spotfire")
+            if requires:
+                for req in requires:
+                    print(req, file=spotfire_requirements)
         constraints = getattr(args, "constraint")
         package_builder.scan_requirements_txt(spotfire_requirements.name, constraints, prefix)
         if hook is not None:
@@ -861,6 +891,7 @@ def packages(args) -> None:
     try:
         # Set up the package builder
         analyst = getattr(args, "analyst")
+        package_builder: _PackageBuilder
         if analyst:
             package_builder = _CabPackageBuilder()
             _process_signing_options(args, package_builder)

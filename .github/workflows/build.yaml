@@ -29,16 +29,6 @@ jobs:
             spotfire/test/files/**
             spotfire/requirements.txt
             test_requirements_*.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: analysis-files
-          path: |
-            pyproject.toml
-            CPPLINT.cfg
-            **/*.pyx
-            **/*.pxd
-            **/*.pxi
-            spotfire/*_helpers.*
       - name: Dynamic Elements
         id: dynamic
         run: |
@@ -153,20 +143,23 @@ jobs:
           python-version: ${{ steps.version.outputs.python-version }}
       - uses: actions/download-artifact@v3
         with:
-          name: wheel-${{ steps.version.outputs.python-version }}-ubuntu-latest
+          name: sdist
           path: dist
       - uses: actions/download-artifact@v3
         with:
-          name: analysis-files
-          path: analysis
+          name: wheel-${{ steps.version.outputs.python-version }}-ubuntu-latest
+          path: dist
       - name: Install Tools
         run: |
           pip install `ls dist/*.whl`[lint]
       - name: Run Analysis Tools
         run: |
-          cd analysis
-          mkdir .save && mv spotfire vendor .save
+          tar zxf dist/spotfire-*.tar.gz
+          # Analyses that work on the installed package
+          mv spotfire-*/pyproject.toml .
           pylint spotfire
-          mv .save/* . && rmdir .save
+          # Analyses that work on the sources of the package
+          mv spotfire-*/{spotfire,vendor} .
+          mypy spotfire
           cython-lint spotfire vendor
           find spotfire -name '*_helpers.[ch]' | xargs cpplint --repository=.

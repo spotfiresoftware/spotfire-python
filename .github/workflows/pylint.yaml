@@ -14,7 +14,10 @@ jobs:
           python-version: '3.x'
       - name: Install Tools
         run: |
-          pip install PyGithub pylint cython-lint cpplint
+          pip install PyGithub pylint mypy cython-lint cpplint pip-tools
+          pip-compile -o types.txt --extra=dev,types setup.py
+          pip install -r types.txt
+          rm types.txt
       - name: Run Analysis Tools
         run: |
           python .github/scripts/run_pylint_check.py --token ${{ secrets.GITHUB_TOKEN }} --repo ${{ github.repository }}

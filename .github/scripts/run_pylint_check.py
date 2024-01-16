@@ -3,6 +3,7 @@
 import argparse
 import glob
 import io
+import logging
 import os
 import subprocess
 import sys
@@ -10,6 +11,7 @@ import sys
 from github import Github
 from pylint import lint as pl_run
 from pylint.__pkginfo__ import __version__ as pl_version
+from mypy.version import __version__ as mp_version
 from cython_lint import cython_lint as cl_run
 from cython_lint import __version__ as cl_version
 from cpplint import __VERSION__ as cp_version
@@ -22,10 +24,16 @@ def main():
     parser.add_argument("--token", help="The GitHub API token to use")
     parser.add_argument("--repo", help="The owner and repository we are operating on")
     args = parser.parse_args()
+
+    # Set up logging
+    logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
+
     # Connect to GitHub REST API
     gh = Github(args.token)
+
     # Run the linters
     pylint(gh, args.repo)
+    mypy(gh, args.repo)
     cython_lint(gh, args.repo)
     cpplint(gh, args.repo)
 
@@ -33,9 +41,10 @@ def main():
 def _check_issues(gh, repo, tool):
     open_issues = gh.search_issues(f"repo:{repo} label:automated/{tool} is:issue is:open")
     if open_issues.totalCount != 0:
-        print(f"Skipping '{tool}' run due to existing issue {open_issues[0].html_url}.")
+        logging.info(f"Found existing 'automated/{tool}' issue: '{open_issues[0].html_url}'.  Skipping '{tool}' run.")
         return True
     else:
+        logging.info(f"Found no existing 'automated/{tool}' issues.")
         return False
 
 
@@ -47,8 +56,8 @@ def _file_issue(gh, repo, tool, tool_args, tool_version, output):
                   f"comment), this is indicative of a new check in this new version of `{tool}`.\n\n"
                   f"Please investigate these issues, and either fix the source or disable the check with a "
                   f"comment.  Further checks by this automation will be held until this issue is closed.  Make "
-                  f"sure that the fix updates the `{tool}` requirement in `pyproject.toml` to the version "
-                  f"identified here ({tool_version}).\n\n"
+                  f"sure that the fix updates the `{tool}` requirement in `pyproject.toml` (the `lint` key of the "
+                  f"`project.optional-dependencies` section) to the version identified here ({tool_version}).\n\n"
                   f"For reference, here is the output of this version of `{tool}`:\n\n"
                   f"```\n"
                   f"$ {tool} {tool_args}\n"
@@ -58,7 +67,7 @@ def _file_issue(gh, repo, tool, tool_args, tool_version, output):
     repo = gh.get_repo(repo)
     repo_label = repo.get_label(f"automated/{tool}")
     new_issue = repo.create_issue(title=issue_title, body=issue_body, labels=[repo_label])
-    print(f"Opened issue {new_issue.html_url}")
+    logging.info(f"Opened issue '{new_issue.html_url}'.")
 
 
 class _StdoutCapture:
@@ -85,12 +94,31 @@ def pylint(gh, repo):
 
     # Now run pylint
     with _StdoutCapture() as capture:
+        logging.info("Running 'pylint spotfire'.")
         result = pl_run.Run(["spotfire"], exit=False)
+        logging.info(f"Return code '{result.linter.msg_status}'.")
     if result.linter.msg_status == 0:
         return
 
     # File an issue
     _file_issue(gh, repo, "pylint", "spotfire", pl_version, capture.output())
+
+
+def mypy(gh, repo):
+    # Determine if we should run pylint
+    if _check_issues(gh, repo, "mypy"):
+        return
+
+    # Now run mypy
+    command = [sys.executable, "-m", "mypy", "spotfire"]
+    logging.info("Running 'mypy spotfire'.")
+    result = subprocess.run(command, capture_output=True, check=False)
+    logging.info(f"Return code '{result.returncode}'.")
+    if result.returncode == 0:
+        return
+
+    # File an issue
+    _file_issue(gh, repo, "mypy", "spotfire", mp_version, result.stdout.decode("utf-8"))
 
 
 def cython_lint(gh, repo):
@@ -100,7 +128,9 @@ def cython_lint(gh, repo):
 
     # Now run cython-lint
     with _StdoutCapture() as capture:
+        logging.info("Running 'cython-lint spotfire vendor'.")
         result = cl_run.main(["spotfire", "vendor"])
+        logging.info(f"Return code '{result}'.")
     if result == 0:
         return
 
@@ -116,8 +146,10 @@ def cpplint(gh, repo):
     # Now run cpplint
     command = [sys.executable, "-m", "cpplint"]
     command.extend(glob.glob("spotfire/*_helpers.[ch]"))
+    logging.info("Running 'cpplint spotfire/*_helpers.[ch]'.")
     result = subprocess.run(command, capture_output=True, check=False)
-    if not result.returncode:
+    logging.info(f"Return code '{result.returncode}'.")
+    if result.returncode == 0:
         return
 
     # File an issue
