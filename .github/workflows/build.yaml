@@ -159,7 +159,7 @@ jobs:
           mv spotfire-*/pyproject.toml .
           pylint spotfire
           # Analyses that work on the sources of the package
-          mv spotfire-*/{spotfire,vendor} .
+          mv spotfire-*/{spotfire,vendor,CPPLINT.cfg} .
           mypy spotfire
           cython-lint spotfire vendor
           find spotfire -name '*_helpers.[ch]' | xargs cpplint --repository=.
