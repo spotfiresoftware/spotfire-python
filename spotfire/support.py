@@ -14,8 +14,8 @@ import sys
 import typing
 
 
-def _tb_operating_system() -> dict:
-    info = {
+def _tb_operating_system() -> typing.Dict[str, typing.Any]:
+    info: typing.Dict[str, typing.Any] = {
         'name': platform.system()
     }
 
@@ -54,8 +54,8 @@ def _tb_operating_system() -> dict:
     return info
 
 
-def _tb_python() -> dict:
-    info = {
+def _tb_python() -> typing.Dict[str, typing.Any]:
+    info: typing.Dict[str, typing.Any] = {
         'impl': sys.implementation.name,
         'version': sys.version
     }
@@ -68,8 +68,8 @@ def _tb_python() -> dict:
     return info
 
 
-def _tb_packages() -> dict:
-    info = {}
+def _tb_packages() -> typing.Dict[str, typing.Any]:
+    info: typing.Dict[str, typing.Any] = {}
 
     # Prepare empty locations to preserve ordering of PYTHONPATH
     for dir_ in sys.path:
@@ -92,7 +92,7 @@ def troubleshooting_bundle() -> str:
 
     :return: a string containing the troubleshooting bundle
     """
-    bundle = {
+    bundle: typing.Dict[str, typing.Any] = {
         'os': _tb_operating_system(),
         'python': _tb_python(),
         'packages': _tb_packages(),
