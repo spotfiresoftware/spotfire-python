@@ -589,28 +589,12 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
 
 def _et_to_bytes(element: ElementTree.Element) -> bytes:
     # Add indentation
-    _et_indent(element)
+    ElementTree.indent(element)
 
     # Serialize the element to a string
     temp_io = io.BytesIO()
     ElementTree.ElementTree(element).write(temp_io, encoding="utf-8", xml_declaration=True)
     return temp_io.getvalue()
-
-
-def _et_indent(element: ElementTree.Element, indent="  ", level=0) -> None:
-    indent_text = "\n" + (level * indent)
-    if element:
-        if not element.text or not element.text.strip():
-            element.text = indent_text + indent
-        if not element.tail or not element.tail.strip():
-            element.tail = indent_text
-        for elem in element:
-            _et_indent(elem, indent, level + 1)
-        if not element.tail or not element.tail.strip():
-            element.tail = indent_text
-    else:
-        if level and (not element.tail or not element.tail.strip()):
-            element.tail = indent_text
 
 
 class _ZipPackageBuilder(_PackageBuilder):
