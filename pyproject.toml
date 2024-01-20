@@ -14,7 +14,7 @@ description = "Package for Building Python Extensions to Spotfire"
 readme = "README.md"
 authors = [{ name = "Cloud Software Group, Inc." }]
 maintainers = [{ name="Spotfire Python Package Support", email = "spotfirepython@tibco.com" }]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     # DataFrame support
     "pandas>=0.24.0,!=1.0.2,!=1.0.3",
@@ -94,7 +94,7 @@ jobs = 1
 limit-inference-results = 100
 # load-plugins =
 persistent = true
-py-version = "3.8"
+py-version = "3.9"
 # recursive =
 # source-roots =
 suggestion-mode = true

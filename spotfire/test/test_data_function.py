@@ -26,7 +26,7 @@ class _PythonVersionedExpectedValue:
         # Read in the all-versions expected output file
         self._load_file(testutils.get_test_data_file(f"data_function/{name}.txt"))
         # Now try to find a better version for our Python interpreter
-        for version in range(sys.version_info.minor, 7, -1):
+        for version in range(sys.version_info.minor, 9, -1):
             filename = testutils.get_test_data_file(f"data_function/{name}-{sys.version_info.major}.{version}.txt")
             if os.path.exists(filename):
                 self._load_file(filename)

@@ -2,7 +2,7 @@ Error executing Python script:
 
   File "<data_function>", line 1
     rais TypeError('from test_syntax_error')
-                 ^
+         ^
 SyntaxError: invalid syntax (<data_function>, line 1)
 
 Traceback (most recent call last):
