@@ -293,26 +293,13 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         """
         _message("Scanning 'spotfire' package files.")
 
-        # Grab the files of the 'spotfire' package.
-        for root, _, filenames in os.walk(spotfire.__path__[0]):
-            for filename in filenames:
-                filename_ondisk = os.path.join(root, filename)
-                filename_relative = os.path.relpath(filename_ondisk, spotfire.__path__[0])
-                filename_payload = f"{prefix}/spotfire-packages/spotfire/{filename_relative}"
-                self.add(filename_ondisk, filename_payload)
-
-        # Grab the .dist-info directory.
-        site_packages_dir = os.path.dirname(spotfire.__path__[0])
-        spotfire_dist_info_re = re.compile(r"^spotfire(-.*)?\.(dist|egg)-info$")
-        for subdir in next(os.walk(site_packages_dir))[1]:
-            if spotfire_dist_info_re.match(subdir):
-                spotfire_dist_info_dir = os.path.join(site_packages_dir, subdir)
-                for root, _, filenames in os.walk(spotfire_dist_info_dir):
-                    for filename in filenames:
-                        filename_ondisk = os.path.join(root, filename)
-                        filename_relative = os.path.relpath(filename_ondisk, spotfire_dist_info_dir)
-                        filename_payload = f"{prefix}/spotfire-packages/{subdir}/{filename_relative}"
-                        self.add(filename_ondisk, filename_payload)
+        sf_dist = imp_md.distribution("spotfire")
+        if isinstance(sf_dist, imp_md.PathDistribution) and _is_editable_distribution(sf_dist):
+            _message("Editable 'spotfire' package installed; resulting SPK package will not function properly.")
+        if sf_dist.files:
+            for file in sf_dist.files:
+                filename_payload = f"{prefix}/spotfire-packages/{'/'.join(file.parts)}"
+                self.add(str(file.locate()), filename_payload)
 
     def scan_requirements_txt(self, requirements: str, constraint: str, prefix: str, prefix_direct: bool = False,
                               use_deny_list: bool = False) -> typing.Dict[str, str]:
@@ -585,6 +572,20 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
             _message("Done.")
         finally:
             os.unlink(payload_tempfile)
+
+
+def _is_editable_distribution(dist: imp_md.PathDistribution) -> bool:
+    # .egg-info implies we're in a development environment
+    editable = ".egg-info" in str(dist._path)  # pylint: disable=protected-access
+    # Otherwise, check for editable (`pip install -e ...`) installs
+    direct_text = dist.read_text("direct_url.json")
+    if direct_text:
+        direct = json.loads(direct_text)
+        if "dir_info" in direct:
+            direct_info = direct["dir_info"]
+            if "editable" in direct_info:
+                editable = direct_info["editable"]
+    return editable
 
 
 def _et_to_bytes(element: ElementTree.Element) -> bytes:
