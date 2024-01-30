@@ -28,8 +28,11 @@ import zipfile
 
 from packaging import requirements as pkg_req, utils as pkg_utils, version as pkg_version
 
-import spotfire
-import spotfire.version
+from spotfire import cabfile, codesign, version as sf_version
+
+_Brand = dict[str, typing.Any]
+_InstalledPackages = dict[str, str]
+_PayloadFileMapping = tuple[str, str]
 
 # Command line parsing helpers
 
@@ -100,7 +103,7 @@ class _SpkVersion:
                    version, and `A.B.C` is the version of the `spotfire` package)
         """
         spk_minor = (sys.version_info.minor * 100) + sys.version_info.micro
-        spotfire_version_components = spotfire.version.__version__.split(".")
+        spotfire_version_components = sf_version.__version__.split(".")
         spk_service_pack = (int(spotfire_version_components[0]) * 10000) + \
                            (int(spotfire_version_components[1]) * 100) + \
                            (int(spotfire_version_components[2]))
@@ -123,7 +126,7 @@ class _SpkVersion:
         self._versions[1] += 1
         self._versions[2:] = [0, 0]
 
-    def _decrement(self, pos, wrap_around) -> None:
+    def _decrement(self, pos, wrap_around: int) -> None:
         while pos >= 0:
             self._versions[pos] -= 1
             if self._versions[pos] < 0:
@@ -164,7 +167,7 @@ class _SpkVersion:
         return self._versions < other._versions
 
 
-def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int = 72) -> None:
+def _brand_file(filename: str, data: _Brand, comment: str, line_length: int = 72) -> None:
     """Brand a file with the JSON representation of data.
 
     :param filename: the filename of the file to brand
@@ -196,7 +199,7 @@ def _brand_file(filename: str, data: typing.Dict, comment: str, line_length: int
         file.writelines(lines)
 
 
-def _read_brand(filename: str, comment: str) -> typing.Dict:
+def _read_brand(filename: str, comment: str) -> _Brand:
     """Read a brand from a file.
 
     :param filename: the filename of the file with the brand
@@ -217,10 +220,10 @@ def _read_brand(filename: str, comment: str) -> typing.Dict:
 
 class _PackageBuilder(metaclass=abc.ABCMeta):
     # pylint: disable=too-many-instance-attributes
-    excludes: typing.List[str]
-    _contents: typing.List[typing.Tuple[str, str]]
-    _cleanup_dirs: typing.List[str]
-    _cleanup_files: typing.List[str]
+    excludes: list[str]
+    _contents: list[_PayloadFileMapping]
+    _cleanup_dirs: list[str]
+    _cleanup_files: list[str]
 
     def __init__(self) -> None:
         self.name = ""
@@ -271,7 +274,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :param prefix: the directory within the package to locate the Python installation at
         """
         try:
-            py_prefix = sys.base_prefix
+            py_prefix: str = sys.base_prefix
         except AttributeError:
             py_prefix = getattr(sys, "real_prefix", sys.prefix)
         _message(f"Scanning Python installation at {py_prefix} for files to include.")
@@ -302,7 +305,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                 self.add(str(file.locate()), filename_payload)
 
     def scan_requirements_txt(self, requirements: str, constraint: str, prefix: str, prefix_direct: bool = False,
-                              use_deny_list: bool = False) -> typing.Dict[str, str]:
+                              use_deny_list: bool = False) -> _InstalledPackages:
         """Scan the contents of a pip 'requirements.txt' file into site-packages.
 
         :param requirements: the filename of the requirements file that declares the pip packages to put in the
@@ -392,7 +395,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
 
         return package_versions
 
-    def remove_included_packages(self, tempdir: str, package_versions: typing.Dict[str, str]) -> typing.Dict[str, str]:
+    def remove_included_packages(self, tempdir: str, package_versions: _InstalledPackages) -> _InstalledPackages:
         """Find and delete packages that would be included with an interpreter Spotfire package from a directory of
         packages.
 
@@ -420,7 +423,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         return package_versions
 
     def _process_package_requirements(self, requirement, extra: typing.Optional[str] = None,
-                                      seen: typing.Optional[typing.Set[str]] = None) -> None:
+                                      seen: typing.Optional[set[str]] = None) -> None:
         """Process the child requirements of a requirement object."""
         # Do not process if the requested extra is not part of the current requirement.
         if requirement.marker and not requirement.marker.evaluate({"extra": extra}):
@@ -446,24 +449,24 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
                     for child_extra in child_req.extras:
                         self._process_package_requirements(child_req, child_extra, seen)
 
-    def requirements_of(self, package: str, extra: typing.Optional[str] = None) -> typing.Set[str]:
+    def requirements_of(self, package: str, extra: typing.Optional[str] = None) -> set[str]:
         """Determine the requirements recursively of a package.
 
         :param package: the name of the package
         :param extra: the extra for the package
         :returns: set of package names that are recursively as requirements of the package
         """
-        packages_seen: typing.Set[str] = set()
+        packages_seen: set[str] = set()
         self._process_package_requirements(pkg_req.Requirement(package), extra, packages_seen)
         return packages_seen
 
-    def requirements_from(self, requirements: str) -> typing.Set[str]:
+    def requirements_from(self, requirements: str) -> set[str]:
         """Determine the requirements recursively of a requirements file.
 
         :param requirements: the text contents of the requirements to recursively determine
         :returns: set of package names that are recursively included by the requirements file
         """
-        packages_seen: typing.Set[str] = set()
+        packages_seen: set[str] = set()
         for line in requirements.splitlines():
             line = re.sub('#.*$', '', line)
             line = line.strip()
@@ -594,6 +597,7 @@ def _et_to_bytes(element: ElementTree.Element) -> bytes:
 
     # Serialize the element to a string
     temp_io = io.BytesIO()
+    # noinspection PyTypeChecker
     ElementTree.ElementTree(element).write(temp_io, encoding="utf-8", xml_declaration=True)
     return temp_io.getvalue()
 
@@ -636,7 +640,7 @@ class _ZipPackageBuilder(_PackageBuilder):
     def _build_payload(self, metadata: ElementTree.Element, module: ElementTree.Element, payload_dest: str) -> None:
         """Build the main payload archive for the SPK package."""
         metadata_files = metadata.find("Files")
-        if not metadata_files:
+        if metadata_files is None:
             raise RuntimeError("no <Files> element found")
         payload_script: typing.List[str] = []
         with zipfile.ZipFile(payload_dest, "w", compression=zipfile.ZIP_DEFLATED) as payload:
@@ -689,6 +693,19 @@ class _CabPackageBuilder(_PackageBuilder):
         self.sha256 = False
         self._resources = []
 
+    def process_signing_options(self, args) -> None:
+        """Process command line options for code signing.
+
+        :param args: the command line arguments processed by argparse
+        """
+        self.cert_file = getattr(args, "cert")
+        self.cert_password = getattr(args, "password")
+        self.cert_store_machine = getattr(args, "store_machine")
+        self.cert_store_name = getattr(args, "store_name")
+        self.cert_store_cn = getattr(args, "store_cn")
+        self.timestamp_url = getattr(args, "timestamp")
+        self.sha256 = getattr(args, "sha256")
+
     def _payload_name(self) -> str:
         """Get the payload archive name for this package."""
         return f"{self.name}.cab"
@@ -718,8 +735,6 @@ class _CabPackageBuilder(_PackageBuilder):
 
     def _build_payload(self, metadata: ElementTree.Element, module: ElementTree.Element, payload_dest: str) -> None:
         """Build the main payload archive for the SPK package."""
-        # pylint: disable=import-outside-toplevel
-        from spotfire import cabfile, codesign
         metadata_files = metadata.find("Files")
         if not metadata_files:
             raise RuntimeError("no <Files> element found")
@@ -793,7 +808,7 @@ def python(args, hook=None) -> None:
     if analyst:
         package_builder = _CabPackageBuilder()
         package_builder.excludes = getattr(args, "exclude")
-        _process_signing_options(args, package_builder)
+        package_builder.process_signing_options(args)
     else:
         package_builder = _ZipPackageBuilder()
         package_builder.excludes = getattr(args, "exclude")
@@ -832,7 +847,8 @@ def python(args, hook=None) -> None:
             requires = imp_md.requires("spotfire")
             if requires:
                 for req in requires:
-                    print(req, file=spotfire_requirements)
+                    if not "extra == " in req:
+                        print(req, file=spotfire_requirements)
         constraints = getattr(args, "constraint")
         package_builder.scan_requirements_txt(spotfire_requirements.name, constraints, prefix)
         if hook is not None:
@@ -879,7 +895,7 @@ def packages(args) -> None:
         package_builder: _PackageBuilder
         if analyst:
             package_builder = _CabPackageBuilder()
-            _process_signing_options(args, package_builder)
+            package_builder.process_signing_options(args)
             brand_subkey = "Analyst"
         else:
             package_builder = _ZipPackageBuilder()
@@ -933,25 +949,11 @@ def packages(args) -> None:
         brand[brand_subkey]["BuiltPackages"] = installed_packages
         _brand_file(requirements_file, brand, "## spotfire.spk: ")
     finally:
+        # noinspection PyUnboundLocalVariable
         package_builder.cleanup()
 
 
-def _process_signing_options(args, package_builder) -> None:
-    """Process command line options for code signing.
-
-    :param args: the command line arguments processed by argparse
-    :param package_builder: the ``PackageBuilder`` object to configure
-    """
-    package_builder.cert_file = getattr(args, "cert")
-    package_builder.cert_password = getattr(args, "password")
-    package_builder.cert_store_machine = getattr(args, "store_machine")
-    package_builder.cert_store_name = getattr(args, "store_name")
-    package_builder.cert_store_cn = getattr(args, "store_cn")
-    package_builder.timestamp_url = getattr(args, "timestamp")
-    package_builder.sha256 = getattr(args, "sha256")
-
-
-def _promote_brand(brand: typing.Dict, analyst: bool) -> typing.Dict:
+def _promote_brand(brand: _Brand, analyst: bool) -> _Brand:
     """Promote the version of a brand to the current representation.
 
     :param brand: the brand to promote
@@ -970,7 +972,7 @@ def _promote_brand(brand: typing.Dict, analyst: bool) -> typing.Dict:
     return brand
 
 
-def _handle_versioning(package_builder: _PackageBuilder, installed_packages: typing.Dict[str, str], brand: typing.Dict,
+def _handle_versioning(package_builder: _PackageBuilder, installed_packages: _InstalledPackages, brand: _Brand,
                        brand_subkey: str, version: typing.Optional[str], force: bool, versioned_filename: bool) -> None:
     """Properly handle the SPK package version given the packages installed by prior versions of the SPK package
     (from the brand) and the set of packages that were downloaded.
@@ -1008,8 +1010,7 @@ def _handle_versioning(package_builder: _PackageBuilder, installed_packages: typ
                                         package_builder.output, 1)
 
 
-def _should_increment_major(old_packages: typing.Dict[str, str], new_packages: typing.Dict[str, str],
-                            force: bool) -> bool:
+def _should_increment_major(old_packages: _InstalledPackages, new_packages: _InstalledPackages, force: bool) -> bool:
     """Determine if the major version of the SPK package should be incremented, instead of the minor version.
 
     :param old_packages: dictionary mapping packages to versions present in the old version of the SPK package

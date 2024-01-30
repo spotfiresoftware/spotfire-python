@@ -4,12 +4,14 @@
 
 """User visible utility functions."""
 
-import typing
 import warnings
 
 import pandas as pd
 
 from spotfire import sbdf
+
+
+_ColumnTypes = dict[str, str]
 
 
 # Table and column metadata functions
@@ -69,7 +71,7 @@ def get_spotfire_types(dataframe: pd.DataFrame) -> pd.Series:
     return pd.Series(spotfire_types)
 
 
-def set_spotfire_types(dataframe: pd.DataFrame, column_types: typing.Dict[str, str]) -> None:
+def set_spotfire_types(dataframe: pd.DataFrame, column_types: _ColumnTypes) -> None:
     """Set Spotfire column types to use when exporting a DataFrame to SBDF.  If any column name or type is invalid,
     a warning will be issued, but any other valid assignments will succeed.
 

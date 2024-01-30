@@ -16,6 +16,14 @@ import re
 from spotfire import sbdf, _utils
 
 
+_ExceptionInfo = typing.Union[
+    tuple[typing.Type[BaseException], BaseException, types.TracebackType],
+    tuple[None, None, None]
+]
+_Globals = dict[str, typing.Any]
+_LogFunction = typing.Callable[[str], None]
+
+
 _COLUMN_METADATA_TRUNCATE_THRESHOLD = 80000
 
 
@@ -91,7 +99,7 @@ class AnalyticInput:
     def __repr__(self) -> str:
         return f"{_utils.type_name(type(self))}({self.name!r}, {self.type!r}, {self.file!r})"
 
-    def read(self, globals_dict: typing.Dict[str, typing.Any], debug_fn: typing.Callable[[str], None]) -> None:
+    def read(self, globals_dict: _Globals, debug_fn: _LogFunction) -> None:
         """Read an input from the corresponding SBDF file into the dict that comprises the set of globals.
 
         :param globals_dict: dict containing the global variables for the data function
@@ -175,7 +183,7 @@ class AnalyticOutput:
     def __repr__(self) -> str:
         return f"{_utils.type_name(type(self))}({self.name!r}, {self.file!r})"
 
-    def write(self, globals_dict: typing.Dict[str, typing.Any], debug_fn: typing.Callable[[str], None]) -> None:
+    def write(self, globals_dict: _Globals, debug_fn: _LogFunction) -> None:
         """Write an output from the dict that comprises the set of globals file into the corresponding SBDF.
 
         :param globals_dict: dict containing the global variables from the data function
@@ -189,8 +197,7 @@ class AnalyticResult:
     """Represents the results of evaluating an AnalyticSpec object."""
     std_err_out: typing.Optional[str]
     summary: typing.Optional[str]
-    _exc_info: typing.Tuple[typing.Optional[typing.Type[BaseException]], typing.Optional[BaseException],
-                            typing.Optional[types.TracebackType]]
+    _exc_info: _ExceptionInfo
     _debug_log: typing.Optional[str]
 
     def __init__(self, capture: _OutputCapture) -> None:
@@ -202,9 +209,7 @@ class AnalyticResult:
         self._capture = capture
         self._debug_log = None
 
-    def fail_with_exception(self, exc_info: typing.Tuple[typing.Optional[typing.Type[BaseException]],
-                                                         typing.Optional[BaseException],
-                                                         typing.Optional[types.TracebackType]]) -> None:
+    def fail_with_exception(self, exc_info: _ExceptionInfo) -> None:
         """Set this result as failed with an exception."""
         self.fail()
         self._exc_info = exc_info
@@ -225,8 +230,7 @@ class AnalyticResult:
         """Get the debug log for this result."""
         return self._debug_log
 
-    def get_exc_info(self) -> typing.Tuple[typing.Optional[typing.Type[BaseException]], typing.Optional[BaseException],
-                                           typing.Optional[types.TracebackType]]:
+    def get_exc_info(self) -> _ExceptionInfo:
         """Get the exception information."""
         return self._exc_info
 
@@ -234,9 +238,10 @@ class AnalyticResult:
 class AnalyticSpec:
     """Represents an analytic spec used to process a data function."""
     # pylint: disable=too-many-instance-attributes
+    globals: _Globals
     compiled_script: typing.Optional[types.CodeType]
 
-    def __init__(self, analytic_type: str, inputs: typing.List[AnalyticInput], outputs: typing.List[AnalyticOutput],
+    def __init__(self, analytic_type: str, inputs: list[AnalyticInput], outputs: list[AnalyticOutput],
                  script: str) -> None:
         """Create an analytic spec.
 

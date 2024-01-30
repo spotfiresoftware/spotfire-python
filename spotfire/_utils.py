@@ -25,7 +25,7 @@ def type_name(type_: typing.Optional[type]) -> str:
 
 class TempFiles:
     """Utility class that manages the lifecycle of multiple temporary files."""
-    _files: typing.List[typing.IO]
+    _files: list[typing.IO]
 
     def __init__(self) -> None:
         self._files = []
