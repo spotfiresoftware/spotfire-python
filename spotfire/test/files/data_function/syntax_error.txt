@@ -7,4 +7,4 @@ SyntaxError: invalid syntax (<data_function>, line 1)
 
 Traceback (most recent call last):
   File "data_function.py", in _compile_script
-    self.compiled_script = compile(self.script, '<data_function>', 'exec')
+    self.compiled_script = compile(self.script, self.script_filename, 'exec')
