@@ -5,11 +5,11 @@ jobs:
     name: Build Source Dist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Set Up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       - name: Install Tools
@@ -18,11 +18,11 @@ jobs:
       - name: Source Packaging
         run: |
           python -m build --sdist
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: sdist
           path: 'dist/**'
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: test-files
           path: |
@@ -50,12 +50,12 @@ jobs:
         operating-system: ['ubuntu-latest', 'windows-latest']
       fail-fast: false
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: sdist
           path: dist
       - name: Set Up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Build Requirements
@@ -81,7 +81,7 @@ jobs:
           python -m build --wheel
           # Move wheel out of build dir into top-level dist dir 
           mv dist\*.whl ..\dist
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
           path: 'dist/*.whl'
@@ -96,16 +96,16 @@ jobs:
         test-environment: ${{ fromJson(needs.build-sdist.outputs.test-environments) }}
       fail-fast: false
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
           path: dist
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: test-files
           path: test-files
       - name: Set Up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies (Linux)
@@ -122,7 +122,7 @@ jobs:
         env:
           TEST_FILES_DIR: ${{ github.workspace }}/test-files/spotfire/test/files
           TEST_ENVIRONMENT: ${{ matrix.test-environment }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: test-results-${{ matrix.python-version }}-${{ matrix.operating-system }}-${{ matrix.test-environment }}
@@ -138,14 +138,14 @@ jobs:
           echo -n "python-version="  >> $GITHUB_OUTPUT
           echo '${{ needs.build-sdist.outputs.python-versions }}' | sed -e 's/[^"]*"//' -e 's/".*//' >> $GITHUB_OUTPUT
       - name: Set Up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ steps.version.outputs.python-version }}
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: sdist
           path: dist
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: wheel-${{ steps.version.outputs.python-version }}-ubuntu-latest
           path: dist
