@@ -250,6 +250,7 @@ class AnalyticSpec:
         self.outputs = outputs if isinstance(outputs, list) else []
         self.script = script
         self.debug_enabled = False
+        self.script_filename = '<data_function>'
         self.globals = {'__builtins__': __builtins__}
         self.log = io.StringIO()
         self.compiled_script = None
@@ -261,6 +262,13 @@ class AnalyticSpec:
     def enable_debug(self) -> None:
         """Turn on the printing of debugging messages."""
         self.debug_enabled = True
+
+    def set_script_filename(self, filename: str) -> None:
+        """Set the filename of the script when this spec object is used for script debugging.
+
+        :param filename: the filename of the script
+        """
+        self.script_filename = filename
 
     def debug(self, message: str) -> None:
         """Output a debugging message to the log if debug is enabled.
@@ -328,7 +336,7 @@ class AnalyticSpec:
         """"Parse and compile the script"""
         # noinspection PyBroadException
         try:
-            self.compiled_script = compile(self.script, '<data_function>', 'exec')
+            self.compiled_script = compile(self.script, self.script_filename, 'exec')
         except BaseException:
             self.debug("script can't be parsed:")
             self.debug("--- script ---")
