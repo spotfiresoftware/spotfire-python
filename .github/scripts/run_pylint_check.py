@@ -78,6 +78,7 @@ class _StdoutCapture:
     def __enter__(self):
         self._saved = sys.stdout
         sys.stdout = self._capture
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         sys.stdout = self._saved
