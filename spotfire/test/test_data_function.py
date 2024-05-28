@@ -44,7 +44,7 @@ class DataFunctionTest(unittest.TestCase):
     """Unit tests for public functions in 'spotfire.data_function' module."""
     # pylint: disable=too-many-branches, too-many-statements, too-many-arguments, too-many-public-methods
 
-    def _run_analytic(self, script, inputs, outputs, success, expected_result, debug=False) -> None:
+    def _run_analytic(self, script, inputs, outputs, success, expected_result, spec_adjust=None) -> None:
         """Run a full pass through the analytic protocol, and compare the output to the expected value."""
         # pylint: disable=protected-access,too-many-locals
         with _utils.TempFiles() as temp_files:
@@ -76,8 +76,8 @@ class DataFunctionTest(unittest.TestCase):
                 tmp.close()
                 output_spec.append(datafn.AnalyticOutput(k, tmp.name))
             spec = datafn.AnalyticSpec("script", input_spec, output_spec, script)
-            if debug:
-                spec.enable_debug()
+            if spec_adjust:
+                spec_adjust(spec)
             print("test: created analytic spec")
             print(repr(spec))
 
@@ -348,6 +348,11 @@ out1 = out1.rename('b')""", {"in1": in1_series}, {"out1": out1_df}, True, None)
 except Exception as e:
     raise TypeError("parent exception") from e""", {}, {}, False, expected)
 
+    @staticmethod
+    def _debug_log(spec):
+        print("test: enabling debug")
+        spec.enable_debug()
+
     def test_debug_log(self):
         """Test that the debug log can be enabled"""
         in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
@@ -356,20 +361,20 @@ except Exception as e:
             in1_df.spotfire_table_metadata = {"tbl_1": [1]}
         in1_df["a"].spotfire_column_metadata = {"col_a_1": [10]}
         expected = _PythonVersionedExpectedValue("debug_log")
-        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, debug=True)
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, spec_adjust=self._debug_log)
 
     def test_debug_log_omit(self):
         """Test that blank metadata is omitted from the debug log"""
         # All columns have no metadata
         in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
         expected = _PythonVersionedExpectedValue("debug_log_omit_1")
-        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, debug=True)
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, spec_adjust=self._debug_log)
 
         # Some columns have no metadata
         in2_df = pd.DataFrame({"a": [1, 2, 3, 4, 5], "b": [6, 7, 8, 9, 10]})
         in2_df['b'].spotfire_column_metadata = {"col_b_1": [11]}
         expected = _PythonVersionedExpectedValue("debug_log_omit_2")
-        self._run_analytic("in2", {"in2": in2_df}, {}, True, expected, debug=True)
+        self._run_analytic("in2", {"in2": in2_df}, {}, True, expected, spec_adjust=self._debug_log)
 
     def test_debug_log_truncate(self):
         """Test that column metadata is truncated properly"""
@@ -380,4 +385,15 @@ except Exception as e:
         for i in range(10000):
             in1_df[f"num{i}"].spotfire_column_metadata = {f"col_num{i}_1": [i]}
         expected = _PythonVersionedExpectedValue("debug_log_truncate")
-        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, debug=True)
+        self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, spec_adjust=self._debug_log)
+
+    @staticmethod
+    def _script_filename(spec, filename):
+        print(f"test: setting script filename to '{filename}'")
+        spec.set_script_filename(filename)
+
+    def test_script_filename(self):
+        """Test that setting a script filename works"""
+        expected = _PythonVersionedExpectedValue("script_filename")
+        self._run_analytic("raise ValueError('nope')", {}, {}, False, expected,
+                           spec_adjust=lambda x: self._script_filename(x, "subdir/value_error.py"))
