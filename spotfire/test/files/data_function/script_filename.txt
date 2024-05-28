@@ -6,4 +6,3 @@ Traceback (most recent call last):
   File "data_function.py", line 417, in _execute_script
     exec(compiled_script, self.globals)
   File "value_error.py", line 1, in <module>
-
