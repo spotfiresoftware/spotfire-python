@@ -591,6 +591,24 @@ def _is_editable_distribution(dist: imp_md.PathDistribution) -> bool:
     return editable
 
 
+def _extract_package_requirements(package_name: str, requirements_file,
+                                  environment: typing.Optional[dict[str, str]] = None) -> None:
+    """Extract the requirements of an installed package to a requirements file.
+
+    :param package_name: the name of the package to extract requirements of
+    :param requirements_file: an opened file to write the requirements to
+    :param environment: additions to the environment used to determine if markers in the requirements are applicable
+    """
+    _message(f"Extracting '{package_name}' package requirements to {requirements_file.name}.")
+    requires = imp_md.requires(package_name)
+    if requires:
+        for req in requires:
+            req_req = pkg_req.Requirement(req)
+            if req_req.marker and not req_req.marker.evaluate(environment):
+                continue
+            print(req, file=requirements_file)
+
+
 def _et_to_bytes(element: ElementTree.Element) -> bytes:
     # Add indentation
     ElementTree.indent(element)
@@ -844,11 +862,7 @@ def python(args, hook=None) -> None:
     try:
         with tempfile.NamedTemporaryFile(mode="wt", prefix="req", suffix=".txt", encoding="utf-8",
                                          delete=False) as spotfire_requirements:
-            requires = imp_md.requires("spotfire")
-            if requires:
-                for req in requires:
-                    if not "extra == " in req:
-                        print(req, file=spotfire_requirements)
+            _extract_package_requirements("spotfire", spotfire_requirements)
         constraints = getattr(args, "constraint")
         package_builder.scan_requirements_txt(spotfire_requirements.name, constraints, prefix)
         if hook is not None:
