@@ -1584,9 +1584,9 @@ cdef int _export_infer_valuetype_from_pandas_dtype(series, series_description):
         return sbdf_c.SBDF_DOUBLETYPEID
     elif dtype == "Float64":
         return sbdf_c.SBDF_DOUBLETYPEID
-    elif dtype.startswith("datetime64[ns"):
+    elif dtype.startswith("datetime64["):
         return sbdf_c.SBDF_DATETIMETYPEID
-    elif dtype == "timedelta64[ns]":
+    elif dtype.startswith("timedelta64["):
         return sbdf_c.SBDF_TIMESPANTYPEID
     elif dtype == "string":
         return sbdf_c.SBDF_STRINGTYPEID

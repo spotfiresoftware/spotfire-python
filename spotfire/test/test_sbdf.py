@@ -8,6 +8,7 @@ import typing
 
 import pandas as pd
 import pandas.testing as pdtest
+import numpy as np
 import geopandas as gpd
 import matplotlib.pyplot
 import seaborn
@@ -427,6 +428,40 @@ class SbdfTest(unittest.TestCase):
             val = df2.at[0, col]
             self.assertAlmostEqual(val, now, msg=f"df2[{col}] = {repr(val)}",
                                    delta=datetime.timedelta(milliseconds=1))  # SBDF has millisecond resolution
+
+    def test_numpy_datetime_resolution(self):
+        """Verify that different NumPy resolutions for datetime64 dtypes export properly."""
+        target = datetime.datetime(2020, 1, 1)
+        inputs = {
+            's': 1577836800,
+            'ms': 1577836800000,
+            'us': 1577836800000000,
+            'ns': 1577836800000000000,
+        }
+        for resolution, timestamp in inputs.items():
+            with self.subTest(resolution=resolution):
+                array = np.array([[0], [timestamp]]).astype(f"datetime64[{resolution}]")
+                dataframe = pd.DataFrame(array, columns=["x"])
+                df2 = self._roundtrip_dataframe(dataframe)
+                val = df2.at[1, 'x']
+                self.assertEqual(val, target)
+
+    def test_numpy_timedelta_resolution(self):
+        """Verify that different NumPy resolutions for timedelta64 dtypes export properly."""
+        target = datetime.timedelta(seconds=38400)
+        inputs = {
+            's': 38400,
+            'ms': 38400000,
+            'us': 38400000000,
+            'ns': 38400000000000,
+        }
+        for resolution, timestamp in inputs.items():
+            with self.subTest(resolution=resolution):
+                array = np.array([[0], [timestamp]]).astype(f"timedelta64[{resolution}]")
+                dataframe = pd.DataFrame(array, columns=["x"])
+                df2 = self._roundtrip_dataframe(dataframe)
+                val = df2.at[1, 'x']
+                self.assertEqual(val, target)
 
     def test_image_matplot(self):
         """Verify Matplotlib figures export properly."""
