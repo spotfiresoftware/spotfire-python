@@ -92,12 +92,27 @@ class AnalyticInput:
         :param input_type: whether the input is a ``table``, a ``column``, or a ``value``
         :param file: the filename of the SBDF file that contains the data to read into this input
         """
-        self.name = name
-        self.type = input_type
-        self.file = file
+        self._name = name
+        self._type = input_type
+        self._file = file
 
     def __repr__(self) -> str:
-        return f"{_utils.type_name(type(self))}({self.name!r}, {self.type!r}, {self.file!r})"
+        return f"{_utils.type_name(type(self))}({self._name!r}, {self._type!r}, {self._file!r})"
+
+    @property
+    def name(self) -> str:
+        """Get the name of this input."""
+        return self._name
+
+    @property
+    def type(self) -> str:
+        """Get the type of this input.  Will be one of ``table``, ``column``, or ``value``."""
+        return self._type
+
+    @property
+    def file(self) -> str:
+        """Get the filename of the SBDF file to deserialize this input from."""
+        return self._file
 
     def read(self, globals_dict: _Globals, debug_fn: _LogFunction) -> None:
         """Read an input from the corresponding SBDF file into the dict that comprises the set of globals.
@@ -107,12 +122,12 @@ class AnalyticInput:
         """
         # pylint: disable=too-many-branches
 
-        if self.type == "NULL":
-            debug_fn(f"assigning missing '{self.name}' as None")
-            globals_dict[self.name] = None
+        if self._type == "NULL":
+            debug_fn(f"assigning missing '{self._name}' as None")
+            globals_dict[self._name] = None
             return
-        debug_fn(f"assigning {self.type} '{self.name}' from file {self.file}")
-        dataframe = sbdf.import_data(self.file)
+        debug_fn(f"assigning {self._type} '{self._name}' from file {self._file}")
+        dataframe = sbdf.import_data(self._file)
         debug_fn(f"read {dataframe.shape[0]} rows {dataframe.shape[1]} columns")
 
         # Table metadata
@@ -149,9 +164,9 @@ class AnalyticInput:
         debug_fn(f"column metadata:{column_meta}")
 
         # Argument type
-        if self.type == "column":
+        if self._type == "column":
             dataframe = dataframe[dataframe.columns[0]]
-        if self.type == "value":
+        if self._type == "value":
             value = dataframe.at[0, dataframe.columns[0]]
             if type(value).__module__ == "numpy":
                 dataframe = value.tolist()
@@ -165,7 +180,7 @@ class AnalyticInput:
                 dataframe = value
 
         # Store to global dict
-        globals_dict[self.name] = dataframe
+        globals_dict[self._name] = dataframe
 
 
 class AnalyticOutput:
@@ -177,11 +192,21 @@ class AnalyticOutput:
         :param name: the name of the output
         :param file: the filename of the SBDF file that will be created by writing from this output
         """
-        self.name = name
-        self.file = file
+        self._name = name
+        self._file = file
 
     def __repr__(self) -> str:
-        return f"{_utils.type_name(type(self))}({self.name!r}, {self.file!r})"
+        return f"{_utils.type_name(type(self))}({self._name!r}, {self._file!r})"
+
+    @property
+    def name(self) -> str:
+        """Get the name of this output."""
+        return self._name
+
+    @property
+    def file(self) -> str:
+        """Get the filename of the SBDF file to serialize this output to."""
+        return self._file
 
     def write(self, globals_dict: _Globals, debug_fn: _LogFunction) -> None:
         """Write an output from the dict that comprises the set of globals file into the corresponding SBDF.
@@ -189,8 +214,8 @@ class AnalyticOutput:
         :param globals_dict: dict containing the global variables from the data function
         :param debug_fn: logging function for debug messages
         """
-        debug_fn(f"returning '{self.name}' as file {self.file}")
-        sbdf.export_data(globals_dict[self.name], self.file, default_column_name=self.name)
+        debug_fn(f"returning '{self._name}' as file {self._file}")
+        sbdf.export_data(globals_dict[self._name], self._file, default_column_name=self._name)
 
 
 class AnalyticResult:
@@ -256,7 +281,11 @@ class AnalyticSpec:
         self.script = script
         self.debug_enabled = False
         self.script_filename = '<data_function>'
-        self.globals = {'__builtins__': __builtins__}
+        self.globals = {
+            '__builtins__': __builtins__,
+            '__spotfire_inputs__': tuple(inputs),
+            '__spotfire_outputs__': tuple(outputs),
+        }
         self.log = io.StringIO()
         self.compiled_script = None
 

@@ -397,3 +397,26 @@ except Exception as e:
         expected = _PythonVersionedExpectedValue("script_filename")
         self._run_analytic("raise ValueError('nope')", {}, {}, False, expected,
                            spec_adjust=lambda x: self._script_filename(x, "subdir/value_error.py"))
+
+    def test_spotfire_inputs_dunder(self):
+        """Test that the ``__spotfire_inputs__`` object works"""
+        in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
+        out_df = pd.DataFrame({"names": ["in1", "in2", "in3"], "types": ["table", "column", "value"]})
+        self._run_analytic("""import pandas as pd
+names = []
+types = []
+for i in __spotfire_inputs__:
+  names.append(i.name)
+  types.append(i.type)
+out = pd.DataFrame({'names': names, 'types': types})""", {"in1": in1_df, "in2": [1, 2, 3, 4, 5], "in3": 0},
+                           {"out": out_df}, True, None)
+
+    def test_spotfire_outputs_dunder(self):
+        """Test that the ``__spotfire_outputs__`` object works"""
+        a_df = pd.DataFrame({"a": ["a", "b", "c", "d", "e"]})
+        b_df = pd.DataFrame({"b": ["x"]})
+        c_df = pd.DataFrame({"c": ["x"]})
+        d_df = pd.DataFrame({"d": ["x"]})
+        e_df = pd.DataFrame({"e": ["x"]})
+        self._run_analytic("""a = [x.name for x in __spotfire_outputs__]
+b = c = d = e = 'x'""", {}, {"a": a_df, "b": b_df, "c": c_df, "d": d_df, "e": e_df}, True, None)
