@@ -2,8 +2,8 @@
 requires = [
     "setuptools >= 40.8",
     "wheel",
-    "Cython >= 3.0",
-    "oldest-supported-numpy",
+    "Cython >= 3.0.4",
+    "numpy >= 2.0.0rc1",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -14,11 +14,12 @@ description = "Package for Building Python Extensions to Spotfire"
 readme = "README.md"
 authors = [{ name = "Cloud Software Group, Inc." }]
 maintainers = [{ name="Spotfire Python Package Support", email = "spotfirepython@tibco.com" }]
-requires-python = ">=3.9"
+requires-python = ">= 3.9"
 dependencies = [
     # DataFrame support
-    "pandas>=0.24.0,!=1.0.2,!=1.0.3",
-    "numpy>=1.22,<2.0",
+    "pandas >= 2.2.2",
+    "numpy >= 1.23.5; python_version < '3.12'",
+    "numpy >= 1.26.0; python_version >= '3.12'",
     # Package interactions
     "packaging",
     "pip >= 21.2",
@@ -40,23 +41,23 @@ Homepage = "https://github.com/spotfiresoftware/spotfire-python"
 # Geographic data support
 geo = [
     "geopandas",
-    "shapely",
+    "shapely >= 2.0.4",
 ]
 # Plotting libraries
 plot-matplotlib = [
-    "matplotlib",
+    "matplotlib >= 3.8.4",
 ]
 plot-pil = [
     "pillow >= 10.0.0",
 ]
 plot-seaborn = [
-    "seaborn",
+    "seaborn >= 0.13.2",
 ]
 plot = [ "spotfire[plot-matplotlib,plot-pil,plot-seaborn]" ]
 # Development requirements
 dev = [
     "spotfire[geo,plot]",
-    "Cython >= 3.0",
+    "Cython >= 3.0.4",
     "html-testRunner",
 ]
 # Static analysis requirements

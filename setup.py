@@ -70,7 +70,7 @@ extensions = [
                        "vendor/sbdf-c/src/valuetype.c",
                        ],
               define_macros=[("SBDF_STATIC", None),
-                             ("NPY_NO_DEPRECATED_API", "NPY_1_7_API_VERSION")],
+                             ("NPY_NO_DEPRECATED_API", "NPY_1_23_API_VERSION")],
               include_dirs=["spotfire", "vendor/sbdf-c/include", np.get_include()]
               ),
 ]
