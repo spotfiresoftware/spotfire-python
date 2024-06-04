@@ -17,7 +17,7 @@ from spotfire import sbdf, _utils
 
 
 _ExceptionInfo = typing.Union[
-    tuple[typing.Type[BaseException], BaseException, types.TracebackType],
+    tuple[type[BaseException], BaseException, types.TracebackType],
     tuple[None, None, None]
 ]
 _Globals = dict[str, typing.Any]
@@ -377,7 +377,6 @@ class AnalyticSpec:
             self.debug_write_script()
             self.debug("--- script ---")
             result.fail_with_exception(sys.exc_info())
-            return
 
     def _read_inputs(self, result: AnalyticResult) -> None:
         """read inputs"""

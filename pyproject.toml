@@ -67,7 +67,7 @@ types = [
     "types-seaborn",
 ]
 lint = [
-    "pylint == 3.0.3",
+    "pylint == 3.2.2",
     "mypy == 1.8.0", "spotfire[types]",
     "cython-lint == 0.16.0",
     "cpplint == 1.6.1",
@@ -88,7 +88,7 @@ fail-under = 10
 # from-stdin =
 ignore = ["CVS"]
 # ignore-paths =
-# ignore-patterns =
+ignore-patterns = [".*.pyi"]
 # ignored-modules =
 # init-hook =
 jobs = 1
