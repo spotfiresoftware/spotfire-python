@@ -4,4 +4,4 @@
 
 """User visible utility functions."""
 
-from spotfire.public import copy_metadata, get_spotfire_types, set_spotfire_types
+from spotfire.public import copy_metadata, get_spotfire_types, set_spotfire_types, set_geocoding_table
