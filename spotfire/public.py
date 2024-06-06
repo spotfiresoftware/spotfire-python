@@ -97,7 +97,7 @@ def set_spotfire_types(dataframe: pd.DataFrame, column_types: _ColumnTypes) -> N
 
 # Spotfire geocoding table functions
 
-def set_geocoding_table(dataframe: gpd.GeoDataFrame) -> None:
+def set_geocoding_table(dataframe: "gpd.GeoDataFrame") -> None:
     """Add the required columns and set properties to export a ``GeoDataFrame`` as a geocoding table for Spotfire.
 
     :param dataframe: the data frame to configure as a geocoding table.
