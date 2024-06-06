@@ -754,7 +754,7 @@ class _CabPackageBuilder(_PackageBuilder):
     def _build_payload(self, metadata: ElementTree.Element, module: ElementTree.Element, payload_dest: str) -> None:
         """Build the main payload archive for the SPK package."""
         metadata_files = metadata.find("Files")
-        if not metadata_files:
+        if metadata_files is None:
             raise RuntimeError("no <Files> element found")
 
         with cabfile.CabFile(payload_dest) as payload:
