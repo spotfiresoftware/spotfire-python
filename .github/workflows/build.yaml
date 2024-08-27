@@ -21,7 +21,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sdist
-          path: 'dist/**'
+          path: 'dist/spotfire-*.tar.gz'
       - uses: actions/upload-artifact@v4
         with:
           name: test-files
@@ -84,7 +84,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
-          path: 'dist/*.whl'
+          path: 'dist/spotfire-*.whl'
   test:
     name: Test
     needs: [build-sdist, build-wheel]
