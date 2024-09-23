@@ -320,7 +320,7 @@ class _PackageBuilder(metaclass=abc.ABCMeta):
         :return: a dict that maps the names of pip packages that were scanned into the SPK package to their
                    installed versions
         """
-        # pylint: disable=too-many-locals,too-many-branches
+        # pylint: disable=too-many-positional-arguments,too-many-locals,too-many-branches
 
         tempdir = tempfile.mkdtemp(prefix="spk")
         self.last_scan_dir = tempdir
@@ -1001,7 +1001,7 @@ def _handle_versioning(package_builder: _PackageBuilder, installed_packages: _In
     :param versioned_filename: whether the user has asked to have the generated version added to the SPK package's
                                  filename
     """
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     package_builder.version = _SpkVersion()
     if "BuiltVersion" in brand[brand_subkey]:
         package_builder.version = _SpkVersion.from_str(brand[brand_subkey]["BuiltVersion"])

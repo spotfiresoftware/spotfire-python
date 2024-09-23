@@ -46,7 +46,7 @@ class DataFunctionTest(unittest.TestCase):
 
     def _run_analytic(self, script, inputs, outputs, success, expected_result, spec_adjust=None) -> None:
         """Run a full pass through the analytic protocol, and compare the output to the expected value."""
-        # pylint: disable=protected-access,too-many-locals
+        # pylint: disable=too-many-positional-arguments,protected-access,too-many-locals
         with _utils.TempFiles() as temp_files:
             input_spec = []
             for k in inputs:

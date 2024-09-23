@@ -28,12 +28,10 @@ def load_tests(loader, tests, pattern):  # pylint: disable=unused-argument
 
 py_version = f"{sys.version_info.major}.{sys.version_info.minor}"
 test_env = os.getenv("TEST_ENVIRONMENT")
+report_title_suffix, report_name = "", f"{platform.system().lower()}-{py_version}"
 if test_env:
     report_title_suffix = f" ({test_env} test environment)"
-    report_name = f"{platform.system().lower()}-{py_version}-{test_env}"
-else:
-    report_title_suffix = f""  # pylint: disable=f-string-without-interpolation
-    report_name = f"{platform.system().lower()}-{py_version}"
+    report_name += f"-{test_env}"
 runner = HtmlTestRunner.HTMLTestRunner(combine_reports=True,
                                        output="build/test-results/",
                                        template=utils.get_test_data_file("template.html.in"),
