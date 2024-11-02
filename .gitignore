@@ -27,6 +27,11 @@ __pycache__/
 
 # PyCharm project files
 /.idea
+/.run
+/.testgen
+
+# local scripts that should not be committed, but should be near the source
+/.local
 
 # generic file backups and other detritus
 *~
