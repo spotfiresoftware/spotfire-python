@@ -247,8 +247,10 @@ cdef class _ImportContext:
     """Object to store information for each column as it is imported."""
     cdef int numpy_type_num
     cdef sbdf_c.sbdf_valuetype value_type
-    cdef np_c.ndarray values_array
-    cdef np_c.ndarray invalid_array
+    #cdef np_c.ndarray values_array
+    #cdef np_c.ndarray invalid_array
+    cdef list values_arrays
+    cdef list invalid_arrays
 
     def __init__(self, numpy_type_num: int):
         """Initialize the import context, including the holding arrays.
@@ -266,11 +268,13 @@ cdef class _ImportContext:
         # Create a zero-element array for holding values
         cdef np_c.npy_intp shape[1]
         shape[0] = <np_c.npy_intp>0
-        self.values_array = np_c.PyArray_SimpleNew(1, shape, self.numpy_type_num)
-
+        #self.values_array = np_c.PyArray_SimpleNew(1, shape, self.numpy_type_num)
+        self.values_arrays = []
+        
         # Create a zero-element array for holding invalids
-        self.invalid_array = np_c.PyArray_SimpleNew(1, shape, np_c.NPY_BOOL)
-
+        #self.invalid_array = np_c.PyArray_SimpleNew(1, shape, np_c.NPY_BOOL)
+        self.invalid_arrays = []
+        
     cdef (int, sbdf_c.sbdf_object*, sbdf_c.sbdf_object*) get_values_and_invalid(self,
                                                                                 sbdf_c.sbdf_columnslice* col_slice):
         """Extract the values and invalid arrays from the column slice.
@@ -319,7 +323,9 @@ cdef class _ImportContext:
         """
         cdef np_c.npy_intp shape[1]
         shape[0] = <np_c.npy_intp>count
-        return np_c.PyArray_SimpleNewFromData(1, shape, self.numpy_type_num, data)
+        #return np_c.PyArray_SimpleNewFromData(1, shape, self.numpy_type_num, data)
+        snfd = np_c.PyArray_SimpleNewFromData(1, shape, self.numpy_type_num, data)
+        return np_c.PyArray_NewCopy(snfd, np_c.NPY_ORDER.NPY_CORDER)
 
     cdef np_c.ndarray new_slice_from_empty(self, int count):
         """Create a NumPy slice ``ndarray`` capable of holding the given amount of data, to be filled in later.
@@ -341,7 +347,9 @@ cdef class _ImportContext:
         cdef np_c.npy_intp shape[1]
         shape[0] = <np_c.npy_intp>count
         if invalid != NULL:
-            return np_c.PyArray_SimpleNewFromData(1, shape, np_c.NPY_BOOL, <void*>invalid.data)
+            #return np_c.PyArray_SimpleNewFromData(1, shape, np_c.NPY_BOOL, <void*>invalid.data)
+            snfd = np_c.PyArray_SimpleNewFromData(1, shape, np_c.NPY_BOOL, <void*>invalid.data)
+            return np_c.PyArray_NewCopy(snfd, np_c.NPY_ORDER.NPY_CORDER)
         else:
             return np_c.PyArray_ZEROS(1, shape, np_c.NPY_BOOL, 0)
 
@@ -351,22 +359,28 @@ cdef class _ImportContext:
         :param values_slice: values NumPy slice array to append
         :param invalid_slice: invalid NumPy slice array to append
         """
-        self.values_array = np.append(self.values_array, values_slice)
-        self.invalid_array = np.append(self.invalid_array, invalid_slice)
+        #self.values_array = np.append(self.values_array, values_slice)
+        #self.invalid_array = np.append(self.invalid_array, invalid_slice)
+        self.values_arrays.append(values_slice)
+        self.invalid_arrays.append(invalid_slice)
 
     cpdef np_c.ndarray get_values_array(self):
         """Get the full table values ``ndarray``.
 
         :return: the full values NumPy array
         """
-        return self.values_array
+        # Build concatenated numpy array
+        return np.concatenate(self.values_arrays)
+        #return self.values_array
 
     cpdef np_c.ndarray get_invalid_array(self):
         """Get the full table invalid ``ndarray``.
 
         :return: the full invalid NumPy array
         """
-        return self.invalid_array
+        # Build concatenated numpy array
+        return np.concatenate(self.invalid_arrays)
+        #return self.invalid_array
 
     def get_pandas_dtype_name(self) -> str:
         """Get the correct Pandas dtype for this column.
