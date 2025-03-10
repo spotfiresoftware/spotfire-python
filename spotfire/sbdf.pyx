@@ -372,7 +372,7 @@ cdef class _ImportContext:
         if self.values_arrays:
             return np.concatenate(self.values_arrays)
         else:
-            return np.array([], dtype=self.numpy_type_num)
+            return np.array([], dtype=np.dtype(self.numpy_type_num).type)
 
     cpdef np_c.ndarray get_invalid_array(self):
         """Get the full table invalid ``ndarray``.
