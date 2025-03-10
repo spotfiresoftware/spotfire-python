@@ -252,27 +252,26 @@ cdef class _ImportContext:
     cdef list values_arrays
     cdef list invalid_arrays
 
-    def __init__(self, numpy_type_num: int):
+    def __init__(self, numpy_type_num: int, vt: sbdf_c.sbdf_valuetype):
         """Initialize the import context, including the holding arrays.
 
         :param numpy_type_num: NumPy type number for the value array; see
                                https://numpy.org/doc/stable/reference/c-api/dtype.html#enumerated-types for more
                                information
+        :param vt: SBDF value type
         """
         # Store the NumPy type number
         self.numpy_type_num = numpy_type_num
 
         # Initialize the SBDF value type
-        self.value_type = sbdf_c.sbdf_valuetype(0)
+        self.value_type = vt
 
         # Create a zero-element array for holding values
         cdef np_c.npy_intp shape[1]
         shape[0] = <np_c.npy_intp>0
-        #self.values_array = np_c.PyArray_SimpleNew(1, shape, self.numpy_type_num)
         self.values_arrays = []
         
         # Create a zero-element array for holding invalids
-        #self.invalid_array = np_c.PyArray_SimpleNew(1, shape, np_c.NPY_BOOL)
         self.invalid_arrays = []
         
     cdef (int, sbdf_c.sbdf_object*, sbdf_c.sbdf_object*) get_values_and_invalid(self,
@@ -370,8 +369,10 @@ cdef class _ImportContext:
         :return: the full values NumPy array
         """
         # Build concatenated numpy array
-        return np.concatenate(self.values_arrays)
-        #return self.values_array
+        if self.values_arrays:
+            return np.concatenate(self.values_arrays)
+        else:
+            return np.array([], dtype=self.numpy_type_num)
 
     cpdef np_c.ndarray get_invalid_array(self):
         """Get the full table invalid ``ndarray``.
@@ -379,8 +380,10 @@ cdef class _ImportContext:
         :return: the full invalid NumPy array
         """
         # Build concatenated numpy array
-        return np.concatenate(self.invalid_arrays)
-        #return self.invalid_array
+        if self.invalid_arrays:
+            return np.concatenate(self.invalid_arrays)
+        else:
+            return np.array([], dtype=np.bool_)
 
     def get_pandas_dtype_name(self) -> str:
         """Get the correct Pandas dtype for this column.
@@ -693,40 +696,40 @@ def import_data(sbdf_file):
             column_names.append(col_name.decode('utf-8'))
 
             if col_type.id == sbdf_c.SBDF_BOOLTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_BOOL))
+                importer_contexts.append(_ImportContext(np_c.NPY_BOOL, col_type))
                 importer_fns[i] = _import_vts_numpy
             elif col_type.id == sbdf_c.SBDF_DOUBLETYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_FLOAT64))
+                importer_contexts.append(_ImportContext(np_c.NPY_FLOAT64, col_type))
                 importer_fns[i] = _import_vts_numpy
             elif col_type.id == sbdf_c.SBDF_LONGTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_INT64))
+                importer_contexts.append(_ImportContext(np_c.NPY_INT64, col_type))
                 importer_fns[i] = _import_vts_numpy
             elif col_type.id == sbdf_c.SBDF_FLOATTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_FLOAT32))
+                importer_contexts.append(_ImportContext(np_c.NPY_FLOAT32, col_type))
                 importer_fns[i] = _import_vts_numpy
             elif col_type.id == sbdf_c.SBDF_INTTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_INT32))
+                importer_contexts.append(_ImportContext(np_c.NPY_INT32, col_type))
                 importer_fns[i] = _import_vts_numpy
             elif col_type.id == sbdf_c.SBDF_DATETIMETYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT))
+                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT, col_type))
                 importer_fns[i] = _import_vt_datetime
             elif col_type.id == sbdf_c.SBDF_DATETYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT))
+                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT, col_type))
                 importer_fns[i] = _import_vt_date
             elif col_type.id == sbdf_c.SBDF_TIMESPANTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT))
+                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT, col_type))
                 importer_fns[i] = _import_vt_timespan
             elif col_type.id == sbdf_c.SBDF_TIMETYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT))
+                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT, col_type))
                 importer_fns[i] = _import_vt_time
             elif col_type.id == sbdf_c.SBDF_STRINGTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT))
+                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT, col_type))
                 importer_fns[i] = _import_vt_string
             elif col_type.id == sbdf_c.SBDF_BINARYTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT))
+                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT, col_type))
                 importer_fns[i] = _import_vt_bytes
             elif col_type.id == sbdf_c.SBDF_DECIMALTYPEID:
-                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT))
+                importer_contexts.append(_ImportContext(np_c.NPY_OBJECT, col_type))
                 importer_fns[i] = _import_vt_decimal
             else:
                 raise SBDFError(f"column '{col_name}' has unsupported type id {col_type.id}")
