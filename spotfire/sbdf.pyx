@@ -372,7 +372,7 @@ cdef class _ImportContext:
         if self.values_arrays:
             return np.concatenate(self.values_arrays)
         else:
-            return np.array([], dtype=np.dtype(context.get_numpy_dtype_from_ctype()))
+            return np.array([], dtype=np.dtype(context.get_numpy_dtype()))
 
     cpdef np_c.ndarray get_invalid_array(self):
         """Get the full table invalid ``ndarray``.
@@ -398,6 +398,24 @@ cdef class _ImportContext:
             return "float32"
         elif self.numpy_type_num == np_c.NPY_FLOAT64:
             return "float64"
+        else:
+            return "object"
+
+    def get_numpy_dtype(self):
+        """Get the correct NumPy dtype for this ctype.
+
+        :return: the NumPy dtype name for this ctype
+        """
+        if self.numpy_type_num == np_c.NPY_INT32:
+            return "int32"
+        elif self.numpy_type_num == np_c.NPY_INT64:
+            return "int64"
+        elif self.numpy_type_num == np_c.NPY_FLOAT32:
+            return "float32"
+        elif self.numpy_type_num == np_c.NPY_FLOAT64:
+            return "float64"
+        elif self.numpy_type_num == np_c.NPY_BOOL:
+            return "bool"
         else:
             return "object"
 
@@ -873,24 +891,6 @@ cdef class _ExportContext:
         elif self.valuetype_id == sbdf_c.SBDF_INTTYPEID:
             return "int32"
         elif self.valuetype_id == sbdf_c.SBDF_BOOLTYPEID:
-            return "bool"
-        else:
-            return "object"
-    
-    def get_numpy_dtype_from_ctype(self):
-        """Get the correct NumPy dtype for this ctype.
-
-        :return: the NumPy dtype name for this ctype
-        """
-        if self.numpy_type_num == np_c.NPY_INT32:
-            return "int32"
-        elif self.numpy_type_num == np_c.NPY_INT64:
-            return "int64"
-        elif self.numpy_type_num == np_c.NPY_FLOAT32:
-            return "float32"
-        elif self.numpy_type_num == np_c.NPY_FLOAT64:
-            return "float64"
-        elif self.numpy_type_num == np_c.NPY_BOOL:
             return "bool"
         else:
             return "object"
