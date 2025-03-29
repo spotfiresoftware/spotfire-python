@@ -247,8 +247,6 @@ cdef class _ImportContext:
     """Object to store information for each column as it is imported."""
     cdef int numpy_type_num
     cdef sbdf_c.sbdf_valuetype value_type
-    #cdef np_c.ndarray values_array
-    #cdef np_c.ndarray invalid_array
     cdef list values_arrays
     cdef list invalid_arrays
 
@@ -270,10 +268,10 @@ cdef class _ImportContext:
         cdef np_c.npy_intp shape[1]
         shape[0] = <np_c.npy_intp>0
         self.values_arrays = []
-        
+
         # Create a zero-element array for holding invalids
         self.invalid_arrays = []
-        
+
     cdef (int, sbdf_c.sbdf_object*, sbdf_c.sbdf_object*) get_values_and_invalid(self,
                                                                                 sbdf_c.sbdf_columnslice* col_slice):
         """Extract the values and invalid arrays from the column slice.
@@ -322,7 +320,6 @@ cdef class _ImportContext:
         """
         cdef np_c.npy_intp shape[1]
         shape[0] = <np_c.npy_intp>count
-        #return np_c.PyArray_SimpleNewFromData(1, shape, self.numpy_type_num, data)
         snfd = np_c.PyArray_SimpleNewFromData(1, shape, self.numpy_type_num, data)
         return np_c.PyArray_NewCopy(snfd, np_c.NPY_ORDER.NPY_CORDER)
 
@@ -346,7 +343,6 @@ cdef class _ImportContext:
         cdef np_c.npy_intp shape[1]
         shape[0] = <np_c.npy_intp>count
         if invalid != NULL:
-            #return np_c.PyArray_SimpleNewFromData(1, shape, np_c.NPY_BOOL, <void*>invalid.data)
             snfd = np_c.PyArray_SimpleNewFromData(1, shape, np_c.NPY_BOOL, <void*>invalid.data)
             return np_c.PyArray_NewCopy(snfd, np_c.NPY_ORDER.NPY_CORDER)
         else:
@@ -358,8 +354,6 @@ cdef class _ImportContext:
         :param values_slice: values NumPy slice array to append
         :param invalid_slice: invalid NumPy slice array to append
         """
-        #self.values_array = np.append(self.values_array, values_slice)
-        #self.invalid_array = np.append(self.invalid_array, invalid_slice)
         self.values_arrays.append(values_slice)
         self.invalid_arrays.append(invalid_slice)
 
