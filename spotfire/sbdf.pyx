@@ -10,6 +10,7 @@ import collections.abc
 import datetime
 import decimal
 import io
+import locale
 import warnings
 
 import cython
@@ -644,7 +645,7 @@ def import_data(sbdf_file):
 
     try:
         # Open the SBDF file
-        input_file = _pathlike_to_fileptr(sbdf_file, "rb")
+        input_file = _pathlike_to_fileptr(sbdf_file.encode(locale.getpreferredencoding()), "rb")
 
         # Read the file header
         error = sbdf_c.sbdf_fh_read(input_file, &major_v, &minor_v)
@@ -1805,7 +1806,7 @@ def export_data(obj, sbdf_file, default_column_name="x", Py_ssize_t rows_per_sli
         table_metadata, column_names, column_metadata, exporter_contexts = exported
 
         # Open the SBDF file
-        output_file = _pathlike_to_fileptr(sbdf_file, "wb")
+        output_file = _pathlike_to_fileptr(sbdf_file.encode(locale.getpreferredencoding()), "wb")
 
         # Create the table metadata structures
         table_md = _export_metadata(table_metadata, -1)
