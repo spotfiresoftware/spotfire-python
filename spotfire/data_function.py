@@ -513,7 +513,7 @@ class AnalyticSpec:
             """trim the path from the exception filename"""
             return f'File "{os.path.basename(match.group(1))}"'
 
-        lines = [re.sub(r'File "([^"]+)"', shorten, line, 1) for line in lines]
+        lines = [re.sub(r'File "([^"]+)"', shorten, line, count=1) for line in lines]
 
         # print the lines
         buf.writelines(lines)
