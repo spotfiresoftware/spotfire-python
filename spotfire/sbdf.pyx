@@ -357,7 +357,7 @@ cdef class _ImportContext:
         self.values_arrays.append(values_slice)
         self.invalid_arrays.append(invalid_slice)
 
-    cpdef np_c.ndarray get_values_array(self, _ImportContext context):
+    cpdef np_c.ndarray get_values_array(self):
         """Get the full table values ``ndarray``.
 
         :return: the full values NumPy array
@@ -366,7 +366,7 @@ cdef class _ImportContext:
         if self.values_arrays:
             return np.concatenate(self.values_arrays)
         else:
-            return np.array([], dtype=np.dtype(context.get_numpy_dtype()))
+            return np.array([], dtype=np.dtype(self.get_numpy_dtype()))
 
     cpdef np_c.ndarray get_invalid_array(self):
         """Get the full table invalid ``ndarray``.
@@ -777,7 +777,7 @@ def import_data(sbdf_file):
         # Build a new DataFrame with the results
         imported_columns = []
         for i in range(num_columns):
-            column_series = pd.Series(importer_contexts[i].get_values_array(importer_contexts[i]),
+            column_series = pd.Series(importer_contexts[i].get_values_array(),
                                       dtype=importer_contexts[i].get_pandas_dtype_name(),
                                       name=column_names[i])
             column_series.loc[importer_contexts[i].get_invalid_array()] = None
