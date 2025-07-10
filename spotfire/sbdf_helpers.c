@@ -8,10 +8,12 @@
 /* Utility functions for opening FILE pointers Pythonically from ``Union[str,bytes,int]``
  * (similar in behavior to Python's open() function).
  */
-FILE *_pathlike_to_fileptr(PyObject *file, const char* mode) {
+FILE *_pathlike_to_fileptr(PyObject *file, const char *mode) {
     FILE *the_file = NULL;
     int fd;
-    char *filename;
+#if defined(_WIN32)
+    wchar_t wmode[8];
+#endif
     PyObject *filename_obj;
 
     /* int: use the given file descriptor */
@@ -19,17 +21,33 @@ FILE *_pathlike_to_fileptr(PyObject *file, const char* mode) {
         fd = PyObject_AsFileDescriptor(file);
         if (fd == -1) return NULL;
         the_file = fdopen(fd, mode);
-    /* bytes: use the given file name */
+#if defined(_WIN32)
+    } else if (PyUnicode_Check(file)) {
+        filename_obj = PyUnicode_AsWideCharString(file, NULL);
+        if (!filename_obj) return NULL;
+        mbstowcs(wmode, mode, sizeof(wmode)/sizeof(wchar_t));
+        the_file = _wfopen((wchar_t *)filename_obj, wmode);
+        PyMem_Free(filename_obj);
     } else if (PyBytes_Check(file)) {
-        filename = PyBytes_AsString(file);
+        PyObject *unicode_obj = PyUnicode_FromEncodedObject(file, "utf-8", "strict");
+        if (!unicode_obj) return NULL;
+        filename_obj = PyUnicode_AsWideCharString(unicode_obj, NULL);
+        Py_DECREF(unicode_obj);
+        if (!filename_obj) return NULL;
+        mbstowcs(wmode, mode, sizeof(wmode)/sizeof(wchar_t));
+        the_file = _wfopen((wchar_t *)filename_obj, wmode);
+        PyMem_Free(filename_obj);
+#else
+    } else if (PyBytes_Check(file)) {
+        const char *filename = PyBytes_AsString(file);
         the_file = fopen(filename, mode);
     /* unicode/str: decode the given filename as utf-8 */
     } else if (PyUnicode_Check(file)) {
         if (!PyUnicode_FSConverter(file, &filename_obj)) return NULL;
-        filename = PyBytes_AsString(filename_obj);
+        const char *filename = PyBytes_AsString(filename_obj);
         the_file = fopen(filename, mode);
         Py_XDECREF(filename_obj);
-    /* else: raise an exception */
+#endif
     } else {
         PyErr_SetString(PyExc_TypeError, "str, bytes, or integer argument expected");
     }

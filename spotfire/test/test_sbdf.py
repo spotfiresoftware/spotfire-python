@@ -1,10 +1,12 @@
 """Tests for importing and exporting data to SBDF files."""
 
+from pathlib import Path
 import datetime
 import decimal
 import unittest
 import tempfile
 import typing
+import os
 
 import pandas as pd
 import pandas.testing as pdtest
@@ -28,8 +30,8 @@ class SbdfTest(unittest.TestCase):
         """Reading simple SBDF files should work."""
         dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/0.sbdf"))
         self._assert_dataframe_shape(dataframe, 0, ["Boolean", "Integer", "Long", "Float",
-                                                   "Double", "DateTime", "Date", "Time",
-                                                   "TimeSpan", "String", "Decimal", "Binary"])
+                                                    "Double", "DateTime", "Date", "Time",
+                                                    "TimeSpan", "String", "Decimal", "Binary"])
 
         def verify(dict_, pre, post):
             """Check all metadata entries for a given table/column."""
@@ -66,8 +68,8 @@ class SbdfTest(unittest.TestCase):
         """Reading simple SBDF files should work."""
         dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/1.sbdf"))
         self._assert_dataframe_shape(dataframe, 1, ["Boolean", "Integer", "Long", "Float",
-                                                   "Double", "DateTime", "Date", "Time",
-                                                   "TimeSpan", "String", "Decimal", "Binary"])
+                                                    "Double", "DateTime", "Date", "Time",
+                                                    "TimeSpan", "String", "Decimal", "Binary"])
 
         self.assertEqual(dataframe.at[0, "Boolean"], False)
         self.assertEqual(dataframe.at[0, "Integer"], 69)
@@ -85,8 +87,8 @@ class SbdfTest(unittest.TestCase):
         """Reading simple SBDF files should work."""
         dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/100.sbdf"))
         self._assert_dataframe_shape(dataframe, 100, ["Boolean", "Integer", "Long", "Float",
-                                                     "Double", "DateTime", "Date", "Time",
-                                                     "TimeSpan", "String", "Decimal", "Binary"])
+                                                      "Double", "DateTime", "Date", "Time",
+                                                      "TimeSpan", "String", "Decimal", "Binary"])
 
         self.assertEqual(dataframe.get("Boolean")[0:6].tolist(), [False, True, None, False, True, None])
         self.assertEqual(dataframe.get("Integer")[0:6].dropna().tolist(), [69.0, 73.0, 75.0, 79.0])
@@ -106,8 +108,8 @@ class SbdfTest(unittest.TestCase):
         """Reading simple SBDF files should work."""
         dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/10001.sbdf"))
         self._assert_dataframe_shape(dataframe, 10001, ["Boolean", "Integer", "Long", "Float",
-                                                       "Double", "DateTime", "Date", "Time",
-                                                       "TimeSpan", "String", "Decimal", "Binary"])
+                                                        "Double", "DateTime", "Date", "Time",
+                                                        "TimeSpan", "String", "Decimal", "Binary"])
 
         # Check the values in the first row
         self.assertEqual(dataframe.at[0, "Boolean"], False)
@@ -489,6 +491,24 @@ class SbdfTest(unittest.TestCase):
         self._assert_dataframe_shape(df2, 1, ['x'])
         val = df2.at[0, "x"]
         self._assert_is_png_image(val)
+
+    def test_export_import_unicode_path(self):
+        """Test export and import with a Unicode file path."""
+        dataframe = pd.DataFrame({"col": [1, 2, 3], "txt": ["a", "b", "c"]})
+        with tempfile.TemporaryDirectory() as tempdir:
+            unicode_filename = Path(tempdir) / "日本語ファイル" / "test.sbdf"
+            os.makedirs(os.path.dirname(unicode_filename), exist_ok=True)
+            # Export to Unicode path
+            sbdf.export_data(dataframe, str(unicode_filename))
+
+            # Import from Unicode path
+            imported = sbdf.import_data(str(unicode_filename))
+
+            # Check roundtrip
+            pd.testing.assert_frame_equal(imported[["col", "txt"]], dataframe, check_dtype=False)
+            # Check dtype of the column
+            self.assertEqual(dataframe["col"].dtype, "int64")
+            self.assertEqual(dataframe["txt"].dtype, "object")
 
     @staticmethod
     def _roundtrip_dataframe(dataframe: typing.Any) -> pd.DataFrame:
