@@ -1,10 +1,12 @@
 """Tests for importing and exporting data to SBDF files."""
 
+from pathlib import Path
 import datetime
 import decimal
 import unittest
 import tempfile
 import pkg_resources
+import os
 
 import pandas
 import pandas.testing
@@ -474,3 +476,21 @@ class SbdfTest(unittest.TestCase):
             self.assertEqual(df2.columns[0], 'x')
             val = df2.at[0, "x"]
             self.assertEqual(val[0:8], b'\x89PNG\x0d\x0a\x1a\x0a')
+
+    def test_export_import_unicode_path(self):
+        """Test export and import with a Unicode file path."""
+        dataframe = pandas.DataFrame({"col": [1, 2, 3], "txt": ["a", "b", "c"]})
+        with tempfile.TemporaryDirectory() as tempdir:
+            unicode_filename = Path(tempdir) / "日本語ファイル" / "test.sbdf"
+            os.makedirs(os.path.dirname(unicode_filename), exist_ok=True)
+            # Export to Unicode path
+            sbdf.export_data(dataframe, str(unicode_filename))
+
+            # Import from Unicode path
+            imported = sbdf.import_data(str(unicode_filename))
+
+            # Check roundtrip
+            pandas.testing.assert_frame_equal(imported[["col", "txt"]], dataframe, check_dtype=False)
+            # Check dtype of the column
+            self.assertEqual(dataframe["col"].dtype, "int64")
+            self.assertEqual(dataframe["txt"].dtype, "object")
