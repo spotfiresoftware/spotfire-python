@@ -5,8 +5,8 @@ import datetime
 import decimal
 import unittest
 import tempfile
-import pkg_resources
 import os
+import pkg_resources
 
 import pandas
 import pandas.testing
