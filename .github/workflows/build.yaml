@@ -3,7 +3,7 @@ on: [push, pull_request]
 jobs:
   build-sdist:
     name: Build Source Dist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         python-version: ${{ fromJson(needs.build-sdist.outputs.python-versions) }}
-        operating-system: ['ubuntu-latest', 'windows-latest']
+        operating-system: ['ubuntu-22.04', 'windows-latest']
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -72,7 +72,7 @@ jobs:
         run: |
           python setup.py bdist_wheel
       - name: Convert Wheel to Manylinux
-        if: ${{ matrix.operating-system == 'ubuntu-latest' }}
+        if: ${{ matrix.operating-system == 'ubuntu-22.04' }}
         run: |
           mv dist/*.whl .
           auditwheel repair -w dist --plat manylinux2014_x86_64 ./*.whl
@@ -87,7 +87,7 @@ jobs:
     strategy:
       matrix:
         python-version: ${{ fromJson(needs.build-sdist.outputs.python-versions) }}
-        operating-system: ['ubuntu-latest', 'windows-latest']
+        operating-system: ['ubuntu-22.04', 'windows-latest']
         test-environment: ${{ fromJson(needs.build-sdist.outputs.test-environments) }}
       fail-fast: false
     steps:
@@ -104,7 +104,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies (Linux)
-        if: matrix.operating-system == 'ubuntu-latest'
+        if: matrix.operating-system == 'ubuntu-22.04'
         run: |
           pip install dist/*.whl -r test-files/test_requirements_${{ matrix.test-environment }}.txt
       - name: Install Dependencies (Windows)
@@ -125,7 +125,7 @@ jobs:
   lint:
     name: Static Analysis
     needs: [build-sdist, build-wheel]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Process Python Version
         id: version
@@ -138,7 +138,7 @@ jobs:
           python-version: ${{ steps.version.outputs.python-version }}
       - uses: actions/download-artifact@v3
         with:
-          name: wheel-${{ steps.version.outputs.python-version }}-ubuntu-latest
+          name: wheel-${{ steps.version.outputs.python-version }}-ubuntu-22.04
           path: dist
       - uses: actions/download-artifact@v3
         with:
