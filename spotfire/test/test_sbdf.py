@@ -500,10 +500,10 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(image)
         self._assert_dataframe_shape(df2, 1, ['x'])
         val = df2.at[0, "x"]
-        if isinstance(image, (bytes, bytearray)):
-            self._assert_is_png_image(image)
+        if isinstance(val, (bytes, bytearray)):
+            self._assert_is_png_image(val)
         else:
-            self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
+            self.fail(f"Expected PNG bytes, got {type(val)}: {val!r}")
 
     def test_export_import_unicode_path(self):
         """Test export and import with a Unicode file path."""
