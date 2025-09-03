@@ -428,8 +428,11 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(dataframe)
         for col in df2.columns:
             val = df2.at[0, col]
-            self.assertAlmostEqual(val, now, msg=f"df2[{col}] = {repr(val)}",
-                                   delta=datetime.timedelta(milliseconds=1))  # SBDF has millisecond resolution
+            # Instead of self.assertAlmostEqual(val, now, delta=timedelta(...))
+            if isinstance(val, (datetime.datetime, pd.Timestamp)):
+                self.assertLessEqual(abs(val - now), datetime.timedelta(milliseconds=1))
+            else:
+                self.assertEqual(val, now) # SBDF has millisecond resolution
 
     def test_numpy_datetime_resolution(self):
         """Verify that different NumPy resolutions for datetime64 dtypes export properly."""
@@ -472,7 +475,10 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(fig)
         self._assert_dataframe_shape(df2, 1, ['x'])
         image = df2.at[0, "x"]
-        self._assert_is_png_image(image)
+        if isinstance(image, (bytes, bytearray)):
+            self._assert_is_png_image(image)
+        else:
+            self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
 
     def test_image_seaborn(self):
         """Verify Seaborn grids export properly."""
@@ -482,7 +488,10 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(grid)
         self._assert_dataframe_shape(df2, 1, ['x'])
         image = df2.at[0, "x"]
-        self._assert_is_png_image(image)
+        if isinstance(image, (bytes, bytearray)):
+            self._assert_is_png_image(image)
+        else:
+            self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
 
     def test_image_pil(self):
         """Verify PIL images export properly."""
@@ -490,7 +499,10 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(image)
         self._assert_dataframe_shape(df2, 1, ['x'])
         val = df2.at[0, "x"]
-        self._assert_is_png_image(val)
+        if isinstance(val, (bytes, bytearray)):
+            self._assert_is_png_image(val)
+        else:
+            self.fail(f"Expected PNG bytes, got {type(val)}: {val!r}")
 
     def test_export_import_unicode_path(self):
         """Test export and import with a Unicode file path."""
@@ -517,7 +529,7 @@ class SbdfTest(unittest.TestCase):
             sbdf.export_data(dataframe, f"{tempdir}/output.sbdf")
             return sbdf.import_data(f"{tempdir}/output.sbdf")
 
-    def _assert_dataframe_shape(self, dataframe: pd.DataFrame, rows: int, column_names: typing.List[str]) -> None:
+    def _assert_dataframe_shape(self, dataframe: pd.DataFrame, rows: int, column_names: list[str]) -> None:
         """Assert that a dataframe has a specific number of rows and the given column names."""
         self.assertEqual(len(dataframe), rows, msg="number of rows")
         self.assertEqual(len(dataframe.columns), len(column_names), msg="number of columns")
