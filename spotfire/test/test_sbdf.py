@@ -475,7 +475,6 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(fig)
         self._assert_dataframe_shape(df2, 1, ['x'])
         image = df2.at[0, "x"]
-        self._assert_is_png_image(image)
         if isinstance(image, (bytes, bytearray)):
             self._assert_is_png_image(image)
         else:
