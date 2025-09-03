@@ -428,11 +428,11 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(dataframe)
         for col in df2.columns:
             val = df2.at[0, col]
-            self.assertLessEqual(
-                abs(val - now),
-                datetime.timedelta(milliseconds=1),
-                msg=f"df2[{col}] = {repr(val)}"
-            ) # SBDF has millisecond resolution
+            # Instead of self.assertAlmostEqual(val, now, delta=timedelta(...))
+            if isinstance(val, (datetime.datetime, pd.Timestamp)):
+                self.assertLessEqual(abs(val - now), datetime.timedelta(milliseconds=1))
+            else:
+                self.assertEqual(val, now) # SBDF has millisecond resolution
 
     def test_numpy_datetime_resolution(self):
         """Verify that different NumPy resolutions for datetime64 dtypes export properly."""
@@ -476,6 +476,10 @@ class SbdfTest(unittest.TestCase):
         self._assert_dataframe_shape(df2, 1, ['x'])
         image = df2.at[0, "x"]
         self._assert_is_png_image(image)
+        if isinstance(image, (bytes, bytearray)):
+            self._assert_is_png_image(image)
+        else:
+            self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
 
     def test_image_seaborn(self):
         """Verify Seaborn grids export properly."""
@@ -485,7 +489,10 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(grid)
         self._assert_dataframe_shape(df2, 1, ['x'])
         image = df2.at[0, "x"]
-        self._assert_is_png_image(image)
+        if isinstance(image, (bytes, bytearray)):
+            self._assert_is_png_image(image)
+        else:
+            self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
 
     def test_image_pil(self):
         """Verify PIL images export properly."""
@@ -493,7 +500,10 @@ class SbdfTest(unittest.TestCase):
         df2 = self._roundtrip_dataframe(image)
         self._assert_dataframe_shape(df2, 1, ['x'])
         val = df2.at[0, "x"]
-        self._assert_is_png_image(val)
+        if isinstance(image, (bytes, bytearray)):
+            self._assert_is_png_image(image)
+        else:
+            self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
 
     def test_export_import_unicode_path(self):
         """Test export and import with a Unicode file path."""
