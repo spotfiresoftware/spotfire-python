@@ -17,7 +17,7 @@ maintainers = [{ name="Spotfire Python Package Support", email = "spotfirepython
 requires-python = ">= 3.9"
 dependencies = [
     # DataFrame support
-    "pandas >= 2.2.2",
+    "pandas >= 2.2.2, < 3.0.0",
     "numpy >= 1.23.5; python_version < '3.12'",
     "numpy >= 1.26.0; python_version >= '3.12'",
     # Package interactions
