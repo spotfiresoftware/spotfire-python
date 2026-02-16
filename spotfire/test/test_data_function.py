@@ -304,11 +304,11 @@ print("(and this too) (E2)")""", {}, {}, True, expected)
         in1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            in1_df.spotfire_table_metadata = {'bravo': ['The second letter of the phonetic alphabet.']}
+            in1_df.spotfire_table_metadata = {'bravo': ['The second letter of the phonetic alphabet.']}   # type: ignore[attr-defined]
         out_md_df = pd.DataFrame(in1_df.spotfire_table_metadata)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            out_md_df.spotfire_table_metadata = {'a': ['Alpha']}
+            out_md_df.spotfire_table_metadata = {'a': ['Alpha']}  # type: ignore[attr-defined]
         expected = _PythonVersionedExpectedValue("table_metadata")
         self._run_analytic("""import pandas as pd
 out_md = pd.DataFrame(in1.spotfire_table_metadata)
@@ -317,10 +317,10 @@ out_md.spotfire_table_metadata = {'a': ['Alpha']}""", {"in1": in1_df}, {"out_md"
     def test_column_metadata(self):
         """Test that column metadata goes in and comes out."""
         in1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-        in1_df['a'].spotfire_column_metadata = {'a': ['Alpha']}
+        in1_df['a'].spotfire_column_metadata = {'a': ['Alpha']} # type: ignore[attr-defined]
         out1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [1.0, 2.0, 3.0]})
-        out1_df['a'].spotfire_column_metadata = {'a': ['Alpha']}
-        out1_df['b'].spotfire_column_metadata = {'b': ['Bravo']}
+        out1_df['a'].spotfire_column_metadata = {'a': ['Alpha']} # type: ignore[attr-defined]
+        out1_df['b'].spotfire_column_metadata = {'b': ['Bravo']} # type: ignore[attr-defined]
         self._run_analytic("""import pandas as pd
 import spotfire
 b = pd.Series([1.0, 2.0, 3.0], name='b')
@@ -358,8 +358,8 @@ except Exception as e:
         in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            in1_df.spotfire_table_metadata = {"tbl_1": [1]}
-        in1_df["a"].spotfire_column_metadata = {"col_a_1": [10]}
+            in1_df.spotfire_table_metadata = {"tbl_1": [1]}  # type: ignore[attr-defined]
+        in1_df["a"].spotfire_column_metadata = {"col_a_1": [10]}  # type: ignore[attr-defined]
         expected = _PythonVersionedExpectedValue("debug_log")
         self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, spec_adjust=self._debug_log)
 
@@ -372,7 +372,7 @@ except Exception as e:
 
         # Some columns have no metadata
         in2_df = pd.DataFrame({"a": [1, 2, 3, 4, 5], "b": [6, 7, 8, 9, 10]})
-        in2_df['b'].spotfire_column_metadata = {"col_b_1": [11]}
+        in2_df['b'].spotfire_column_metadata = {"col_b_1": [11]}  # type: ignore[attr-defined]
         expected = _PythonVersionedExpectedValue("debug_log_omit_2")
         self._run_analytic("in2", {"in2": in2_df}, {}, True, expected, spec_adjust=self._debug_log)
 
@@ -383,7 +383,7 @@ except Exception as e:
             in1_dict[f"num{i}"] = [i, i+1, i+2]
         in1_df = pd.DataFrame(in1_dict)
         for i in range(10000):
-            in1_df[f"num{i}"].spotfire_column_metadata = {f"col_num{i}_1": [i]}
+            in1_df[f"num{i}"].spotfire_column_metadata = {f"col_num{i}_1": [i]}  # type: ignore[attr-defined]
         expected = _PythonVersionedExpectedValue("debug_log_truncate")
         self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, spec_adjust=self._debug_log)
 
