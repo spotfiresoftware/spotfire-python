@@ -304,7 +304,9 @@ print("(and this too) (E2)")""", {}, {}, True, expected)
         in1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            in1_df.spotfire_table_metadata = {'bravo': ['The second letter of the phonetic alphabet.']}   # type: ignore[attr-defined]
+            in1_df.spotfire_table_metadata = {  # type: ignore[attr-defined]
+                'bravo': ['The second letter of the phonetic alphabet.']
+            }
         out_md_df = pd.DataFrame(in1_df.spotfire_table_metadata)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
