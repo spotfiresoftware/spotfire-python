@@ -87,6 +87,7 @@ jobs:
       - name: Set SBOM metadata
         id: meta
         run: |
+          # Extract just "spotfire-2.5.0.dev0" from "spotfire-2.5.0.dev0.tar.gz"
           PKG_NAME=$(ls dist/spotfire-*.tar.gz | sed 's|dist/||;s|\.tar\.gz||')
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "pkg_name=$PKG_NAME"                                    >> $GITHUB_OUTPUT
@@ -172,7 +173,9 @@ jobs:
       - name: Set SBOM metadata
         id: meta
         run: |
-          PKG_NAME=$(ls dist/spotfire-*.whl | sed 's|dist/||;s|\.whl||')
+          # Extract just "spotfire-2.5.0.dev0" from the full wheel filename
+          # wheel format: {name}-{version}-{python}-{abi}-{platform}.whl
+          PKG_NAME=$(ls dist/spotfire-*.whl | sed 's|dist/||;s|\.whl||' | cut -d- -f1,2)
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "pkg_name=$PKG_NAME"                                    >> $GITHUB_OUTPUT
           echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED" >> $GITHUB_OUTPUT
