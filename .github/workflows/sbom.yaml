@@ -160,26 +160,38 @@ jobs:
         if: github.event_name != 'workflow_run' && matrix.os == 'windows-latest'
         run: echo "Windows wheels cannot be cross-compiled on Linux; skipping build."
 
+      - name: Check wheel exists
+        id: wheel_check
+        run: |
+          if ls dist/spotfire-*.whl 1>/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Unpack wheel
+        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           mkdir wheel-unpacked
-          cd wheel-unpacked
-          unzip -q ../dist/spotfire-*.whl
+          unzip -q dist/spotfire-*.whl -d wheel-unpacked
 
       - name: Set SBOM metadata
         id: meta
+        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           PKG_NAME=$(ls dist/spotfire-*.whl | sed 's|dist/||;s|\.whl||')
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED" >> $GITHUB_OUTPUT
 
       - name: Install Trivy ${{ env.TRIVY_VERSION }}
+        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           curl -sSfL https://github.com/aquasecurity/trivy/releases/download/v${{ env.TRIVY_VERSION }}/trivy_${{ env.TRIVY_VERSION }}_Linux-64bit.tar.gz \
             | tar -xz trivy
           sudo mv trivy /usr/local/bin/trivy
 
       - name: Trivy scan → raw SPDX JSON
+        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           trivy fs wheel-unpacked \
             --format spdx-json \
@@ -187,6 +199,7 @@ jobs:
             --quiet
 
       - name: Patch SBOM metadata and strip annotations
+        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           python .github/scripts/patch_sbom.py \
             --input  _trivy_raw.spdx.json \
@@ -196,6 +209,7 @@ jobs:
             --tool "trivy-${{ env.TRIVY_VERSION }}"
 
       - name: Upload SBOM artifact
+        if: steps.wheel_check.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sbom-wheel-${{ matrix.python-version }}-${{ matrix.os }}
