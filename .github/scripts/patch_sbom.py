@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 """
 patch_sbom.py  —  Post-process a Trivy-generated SPDX JSON file to:
-  1. Set name               to the package name (not the wheel filename)
+  1. Set name               to the package name (not the scanned folder name)
   2. Set documentNamespace  to the required pattern
   3. Set creationInfo.creators  (Organization + Tool line)
   4. Set creationInfo.created   (current UTC timestamp)
   5. Set spdxVersion            to SPDX-2.3
-  6. Remove synthetic Trivy filesystem/source root packages
-  7. Remove internal test/noise packages (e.g. setuptools' my-test-package)
-  8. Remove the files[] section (internal test eggs, not real deliverables)
-  9. Remove annotations / comments Trivy adds to packages
+  6. Remove synthetic Trivy APPLICATION package (requirements.txt container)
+  7. Remove synthetic Trivy filesystem/source root packages
+  8. Remove internal test/noise packages (e.g. setuptools' my-test-package)
+  9. Remove the files[] section (internal test eggs, not real deliverables)
+  10. Promote relationships: replace the removed container's SPDXID with
+      SPDXRef-DOCUMENT so each real package becomes DESCRIBED BY the document
+  11. Remove annotations / comments Trivy adds to packages
 """
 
 import argparse
 import json
-import re
 from datetime import datetime, timezone
 
 _STRIP_PKG_FIELDS = {"annotations", "comment"}
@@ -25,18 +27,17 @@ _NOISE_PACKAGE_NAMES = {
     "my_test_package",
 }
 
-# SPDX package purposes that are Trivy synthetic scan-root artefacts
-_SYNTHETIC_PURPOSES = {"SOURCE"}
+# SPDX package purposes that are Trivy synthetic scan-root / container artefacts
+_SYNTHETIC_PURPOSES = {"SOURCE", "APPLICATION"}
 
 
 def _is_synthetic(pkg: dict) -> bool:
-    """True for Trivy's filesystem scan-root package (not a real dependency)."""
-    if pkg.get("primaryPackagePurpose") in _SYNTHETIC_PURPOSES:
-        # Must also have no purl to be sure it's the scan root
-        refs = pkg.get("externalRefs", [])
-        if not any(r.get("referenceType") == "purl" for r in refs):
-            return True
-    return False
+    """True for Trivy's scan-root and requirements.txt container packages."""
+    if pkg.get("primaryPackagePurpose") not in _SYNTHETIC_PURPOSES:
+        return False
+    # Only remove if it has no purl (i.e. it's not a real package)
+    refs = pkg.get("externalRefs", [])
+    return not any(r.get("referenceType") == "purl" for r in refs)
 
 
 def _is_noise(pkg: dict) -> bool:
@@ -55,7 +56,7 @@ def patch(input_path: str, output_path: str,
     # 1. SPDX version
     doc["spdxVersion"] = "SPDX-2.3"
 
-    # 2. Document name — clean package name, not wheel filename
+    # 2. Document name
     doc["name"] = name
 
     # 3. Namespace
@@ -70,30 +71,66 @@ def patch(input_path: str, output_path: str,
         f"Tool: {tool}",
     ]
 
-    # 5. Filter packages — remove synthetic scan-root + noise packages
-    removed_spdxids = set()
+    # 5. Filter packages — track removed SPDXIDs so we can fix relationships
+    removed_spdxids = set()   # synthetic / noise packages to remove
     kept_packages = []
     for pkg in doc.get("packages", []):
         if _is_synthetic(pkg) or _is_noise(pkg):
-            removed_spdxids.add(pkg.get("SPDXID"))
+            removed_spdxids.add(pkg["SPDXID"])
             continue
-        # Strip Trivy-added fields
         for field in _STRIP_PKG_FIELDS:
             pkg.pop(field, None)
         kept_packages.append(pkg)
     doc["packages"] = kept_packages
 
-    # 6. Remove files[] section entirely (internal test eggs, not deliverables)
+    # 6. Remove files[] section (internal test eggs, not deliverables)
     doc.pop("files", None)
 
-    # 7. Remove relationships that reference removed packages or files
+    # 7. Rewrite relationships:
+    #    - Drop any rel whose *target* was removed
+    #    - Replace the *source* of CONTAINS rels that came from a removed
+    #      synthetic container (requirements.txt / filesystem root) with
+    #      SPDXRef-DOCUMENT, and change type to DESCRIBES
     kept_rels = []
+    seen_describes = set()   # avoid duplicate DESCRIBES entries
+
     for rel in doc.get("relationships", []):
-        if (rel.get("spdxElementId") in removed_spdxids or
-                rel.get("relatedSpdxElement") in removed_spdxids):
+        src  = rel["spdxElementId"]
+        tgt  = rel["relatedSpdxElement"]
+        kind = rel["relationshipType"]
+
+        # Drop if the target was removed
+        if tgt in removed_spdxids:
             continue
-        # Also drop DESCRIBES relationships pointing at the old scan-root
+
+        # Promote: if the source was a removed synthetic container,
+        # rewrite as SPDXRef-DOCUMENT DESCRIBES <package>
+        if src in removed_spdxids:
+            if kind == "CONTAINS":
+                key = ("SPDXRef-DOCUMENT", tgt)
+                if key not in seen_describes:
+                    kept_rels.append({
+                        "spdxElementId": "SPDXRef-DOCUMENT",
+                        "relatedSpdxElement": tgt,
+                        "relationshipType": "DESCRIBES",
+                    })
+                    seen_describes.add(key)
+            continue   # drop the original rel with the removed source
+
         kept_rels.append(rel)
+
+    # Ensure every kept package has at least a DESCRIBES from the document
+    kept_pkg_ids = {p["SPDXID"] for p in kept_packages}
+    described = {r["relatedSpdxElement"]
+                 for r in kept_rels if r["relationshipType"] == "DESCRIBES"
+                 and r["spdxElementId"] == "SPDXRef-DOCUMENT"}
+    for spdx_id in kept_pkg_ids - described:
+        kept_rels.append({
+            "spdxElementId": "SPDXRef-DOCUMENT",
+            "relatedSpdxElement": spdx_id,
+            "relationshipType": "DESCRIBES",
+        })
+
     doc["relationships"] = kept_rels
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -105,8 +142,7 @@ def patch(input_path: str, output_path: str,
     print(f"  namespace : {namespace}")
     print(f"  created   : {now}")
     print(f"  creators  : Organization: {org} | Tool: {tool}")
-    print(f"  packages  : {len(doc.get('packages', []))} kept, {len(removed_spdxids)} removed")
-    print(f"  files     : removed (internal test artefacts)")
+    print(f"  packages  : {len(kept_packages)} kept, {len(removed_spdxids)} removed")
 
 
 def main() -> None:
