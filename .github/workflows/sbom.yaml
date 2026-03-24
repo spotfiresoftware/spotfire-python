@@ -53,7 +53,9 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4   # needed for patch_sbom.py
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # needed for vendor/sbdf-c when building/installing sdist
 
       # workflow_run: reuse artifact from build.yaml — no rebuild
       - name: Download sdist (from workflow_run)
@@ -130,7 +132,9 @@ jobs:
         python-version: ${{ fromJson(needs.setup.outputs.python-versions) }}
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4   # needed for patch_sbom.py
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # needed for vendor/sbdf-c when building wheel fresh
 
       # workflow_run: reuse the ubuntu wheel artifact from build.yaml — no rebuild
       - name: Download wheel (from workflow_run)
