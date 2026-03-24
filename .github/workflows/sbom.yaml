@@ -78,7 +78,7 @@ jobs:
           pip install build
           python -m build --sdist
 
-      # Install the sdist into an isolated venv so Trivy can detect all packages
+      # Install the sdist into an isolated venv so we can freeze its dependencies
       - name: Install sdist into scan-env
         run: |
           python -m venv scan-env
@@ -87,7 +87,6 @@ jobs:
       - name: Set SBOM metadata
         id: meta
         run: |
-          # Extract just "spotfire-2.5.0.dev0" from "spotfire-2.5.0.dev0.tar.gz"
           PKG_NAME=$(ls dist/spotfire-*.tar.gz | sed 's|dist/||;s|\.tar\.gz||')
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "pkg_name=$PKG_NAME"                                    >> $GITHUB_OUTPUT
@@ -99,13 +98,19 @@ jobs:
             | tar -xz trivy
           sudo mv trivy /usr/local/bin/trivy
 
-      # Scan the venv site-packages — Trivy finds all installed Python packages here
+      # Freeze installed packages into requirements.txt then scan for licenses
+      # This avoids Trivy picking up test eggs / synthetic filesystem packages
       - name: Trivy scan → raw SPDX JSON
         run: |
-          trivy fs scan-env/lib/python*/site-packages \
+          scan-env/bin/pip freeze > requirements.txt
+          trivy fs \
+            --scanners license \
+            --license-full \
             --format spdx-json \
             --output _trivy_raw.spdx.json \
-            --quiet
+            --quiet \
+            requirements.txt
+          rm requirements.txt
 
       - name: Patch SBOM metadata and strip annotations
         run: |
@@ -164,7 +169,7 @@ jobs:
           python -m build --wheel
           auditwheel repair -w ../dist --plat manylinux2014_x86_64 dist/*.whl
 
-      # Install wheel into isolated venv so Trivy detects all installed packages
+      # Install wheel into isolated venv so we can freeze its dependencies
       - name: Install wheel into scan-env
         run: |
           python -m venv scan-env
@@ -173,8 +178,6 @@ jobs:
       - name: Set SBOM metadata
         id: meta
         run: |
-          # Extract just "spotfire-2.5.0.dev0" from the full wheel filename
-          # wheel format: {name}-{version}-{python}-{abi}-{platform}.whl
           PKG_NAME=$(ls dist/spotfire-*.whl | sed 's|dist/||;s|\.whl||' | cut -d- -f1,2)
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "pkg_name=$PKG_NAME"                                    >> $GITHUB_OUTPUT
@@ -186,13 +189,19 @@ jobs:
             | tar -xz trivy
           sudo mv trivy /usr/local/bin/trivy
 
-      # Scan the venv site-packages — Trivy finds all installed Python packages here
+      # Freeze installed packages into requirements.txt then scan for licenses
+      # This avoids Trivy picking up test eggs / synthetic filesystem packages
       - name: Trivy scan → raw SPDX JSON
         run: |
-          trivy fs scan-env/lib/python*/site-packages \
+          scan-env/bin/pip freeze > requirements.txt
+          trivy fs \
+            --scanners license \
+            --license-full \
             --format spdx-json \
             --output _trivy_raw.spdx.json \
-            --quiet
+            --quiet \
+            requirements.txt
+          rm requirements.txt
 
       - name: Patch SBOM metadata and strip annotations
         run: |
