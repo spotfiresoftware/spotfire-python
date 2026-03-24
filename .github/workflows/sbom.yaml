@@ -1,10 +1,6 @@
 name: Generate SBOM
 
 on:
-  # TEST ONLY: trigger on push to this branch so the workflow can be validated
-  # without merging to main. Remove this block before merging.
-  push:
-    branches: [feature/sbom-generation]
   # Runs after build.yaml completes successfully on main — no duplicate build
   workflow_run:
     workflows: ["Build and Test Package"]
@@ -32,7 +28,6 @@ jobs:
   setup:
     name: Read Config
     if: >
-      github.event_name == 'push' ||
       github.event_name == 'release' ||
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
