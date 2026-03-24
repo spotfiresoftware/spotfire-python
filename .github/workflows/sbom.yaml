@@ -23,7 +23,7 @@ permissions:
 
 # Shared values that appear in every SBOM's creationInfo / documentNamespace
 env:
-  TRIVY_VERSION: "0.68.2"
+  TRIVY_VERSION: "0.69.3"
   SBOM_ORG: "Cloud Software Group, Inc., Spotfire"
   SBOM_NS_BASE: "https://spotfire.com/spdx"
 
