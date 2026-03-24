@@ -53,6 +53,8 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4   # needed for patch_sbom.py
+
       # workflow_run: reuse artifact from build.yaml — no rebuild
       - name: Download sdist (from workflow_run)
         if: github.event_name == 'workflow_run'
@@ -63,11 +65,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # release / workflow_dispatch: build fresh (no prior workflow_run artifact)
-      - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_run'
-        with:
-          submodules: recursive
+      # push / release / workflow_dispatch: build fresh
       - name: Set Up Python
         if: github.event_name != 'workflow_run'
         uses: actions/setup-python@v5
@@ -84,15 +82,12 @@ jobs:
           mkdir sdist-unpacked
           tar xzf dist/spotfire-*.tar.gz -C sdist-unpacked --strip-components=1
 
-      # Derive a stable, reproducible namespace: base/name-version/created
       - name: Set SBOM metadata
         id: meta
         run: |
           PKG_NAME=$(ls dist/spotfire-*.tar.gz | sed 's|dist/||;s|\.tar\.gz||')
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "pkg_name=$PKG_NAME"                                          >> $GITHUB_OUTPUT
-          echo "created=$CREATED"                                             >> $GITHUB_OUTPUT
-          echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED"       >> $GITHUB_OUTPUT
+          echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED" >> $GITHUB_OUTPUT
 
       - name: Install Trivy ${{ env.TRIVY_VERSION }}
         run: |
@@ -100,15 +95,21 @@ jobs:
             | tar -xz trivy
           sudo mv trivy /usr/local/bin/trivy
 
-      - name: Generate SBOM (SPDX JSON)
+      - name: Trivy scan → raw SPDX JSON
         run: |
           trivy fs sdist-unpacked \
             --format spdx-json \
+            --output _trivy_raw.spdx.json \
+            --quiet
+
+      - name: Patch SBOM metadata and strip annotations
+        run: |
+          python .github/scripts/patch_sbom.py \
+            --input  _trivy_raw.spdx.json \
             --output spotfire-sdist.sbom.spdx.json \
-            --spdx-version 2.3 \
             --namespace "${{ steps.meta.outputs.namespace }}" \
-            --author "Organization: ${{ env.SBOM_ORG }}" \
-            --created "${{ steps.meta.outputs.created }}"
+            --org  "${{ env.SBOM_ORG }}" \
+            --tool "trivy-${{ env.TRIVY_VERSION }}"
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
@@ -127,6 +128,8 @@ jobs:
         os: [ubuntu-latest, windows-latest]
       fail-fast: false
     steps:
+      - uses: actions/checkout@v4   # needed for patch_sbom.py
+
       # workflow_run: reuse wheel artifact from build.yaml — no rebuild
       - name: Download wheel (from workflow_run)
         if: github.event_name == 'workflow_run'
@@ -137,11 +140,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # release / workflow_dispatch: build fresh
-      - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_run'
-        with:
-          submodules: recursive
+      # push / release / workflow_dispatch: build fresh
       - name: Set Up Python
         if: github.event_name != 'workflow_run'
         uses: actions/setup-python@v5
@@ -150,6 +149,7 @@ jobs:
       - name: Build sdist then wheel (Linux only — cross-compile not supported)
         if: github.event_name != 'workflow_run' && matrix.os == 'ubuntu-latest'
         run: |
+          git submodule update --init --recursive
           pip install auditwheel build setuptools
           python -m build --sdist
           tar xzf dist/spotfire-*.tar.gz
@@ -171,9 +171,7 @@ jobs:
         run: |
           PKG_NAME=$(ls dist/spotfire-*.whl | sed 's|dist/||;s|\.whl||')
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          echo "pkg_name=$PKG_NAME"                                          >> $GITHUB_OUTPUT
-          echo "created=$CREATED"                                             >> $GITHUB_OUTPUT
-          echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED"       >> $GITHUB_OUTPUT
+          echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED" >> $GITHUB_OUTPUT
 
       - name: Install Trivy ${{ env.TRIVY_VERSION }}
         run: |
@@ -181,15 +179,21 @@ jobs:
             | tar -xz trivy
           sudo mv trivy /usr/local/bin/trivy
 
-      - name: Generate SBOM (SPDX JSON)
+      - name: Trivy scan → raw SPDX JSON
         run: |
           trivy fs wheel-unpacked \
             --format spdx-json \
+            --output _trivy_raw.spdx.json \
+            --quiet
+
+      - name: Patch SBOM metadata and strip annotations
+        run: |
+          python .github/scripts/patch_sbom.py \
+            --input  _trivy_raw.spdx.json \
             --output spotfire-wheel-${{ matrix.python-version }}-${{ matrix.os }}.sbom.spdx.json \
-            --spdx-version 2.3 \
             --namespace "${{ steps.meta.outputs.namespace }}" \
-            --author "Organization: ${{ env.SBOM_ORG }}" \
-            --created "${{ steps.meta.outputs.created }}"
+            --org  "${{ env.SBOM_ORG }}" \
+            --tool "trivy-${{ env.TRIVY_VERSION }}"
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
