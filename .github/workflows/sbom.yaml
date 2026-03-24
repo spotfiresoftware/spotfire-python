@@ -67,7 +67,6 @@ jobs:
 
       # push / release / workflow_dispatch: build fresh
       - name: Set Up Python
-        if: github.event_name != 'workflow_run'
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -77,16 +76,18 @@ jobs:
           pip install build
           python -m build --sdist
 
-      - name: Unpack sdist
+      # Install the sdist into an isolated venv so Trivy can detect all packages
+      - name: Install sdist into scan-env
         run: |
-          mkdir sdist-unpacked
-          tar xzf dist/spotfire-*.tar.gz -C sdist-unpacked --strip-components=1
+          python -m venv scan-env
+          scan-env/bin/pip install --quiet dist/spotfire-*.tar.gz
 
       - name: Set SBOM metadata
         id: meta
         run: |
           PKG_NAME=$(ls dist/spotfire-*.tar.gz | sed 's|dist/||;s|\.tar\.gz||')
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "pkg_name=$PKG_NAME"                                    >> $GITHUB_OUTPUT
           echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED" >> $GITHUB_OUTPUT
 
       - name: Install Trivy ${{ env.TRIVY_VERSION }}
@@ -95,9 +96,10 @@ jobs:
             | tar -xz trivy
           sudo mv trivy /usr/local/bin/trivy
 
+      # Scan the venv site-packages — Trivy finds all installed Python packages here
       - name: Trivy scan → raw SPDX JSON
         run: |
-          trivy fs sdist-unpacked \
+          trivy fs scan-env/lib/python*/site-packages \
             --format spdx-json \
             --output _trivy_raw.spdx.json \
             --quiet
@@ -108,8 +110,9 @@ jobs:
             --input  _trivy_raw.spdx.json \
             --output spotfire-sdist.sbom.spdx.json \
             --namespace "${{ steps.meta.outputs.namespace }}" \
-            --org  "${{ env.SBOM_ORG }}" \
-            --tool "trivy-${{ env.TRIVY_VERSION }}"
+            --name     "${{ steps.meta.outputs.pkg_name }}" \
+            --org      "${{ env.SBOM_ORG }}" \
+            --tool     "trivy-${{ env.TRIVY_VERSION }}"
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
@@ -119,35 +122,34 @@ jobs:
 
   # ── 3. SBOM for each wheel ─────────────────────────────────────────────────
   sbom-wheel:
-    name: SBOM – Wheel (${{ matrix.python-version }}, ${{ matrix.os }})
+    name: SBOM – Wheel (${{ matrix.python-version }})
     needs: setup
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest       # Linux only — Windows wheels cannot be cross-compiled
     strategy:
       matrix:
         python-version: ${{ fromJson(needs.setup.outputs.python-versions) }}
-        os: [ubuntu-latest, windows-latest]
       fail-fast: false
     steps:
       - uses: actions/checkout@v4   # needed for patch_sbom.py
 
-      # workflow_run: reuse wheel artifact from build.yaml — no rebuild
+      # workflow_run: reuse the ubuntu wheel artifact from build.yaml — no rebuild
       - name: Download wheel (from workflow_run)
         if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
-          name: wheel-${{ matrix.python-version }}-${{ matrix.os }}
+          name: wheel-${{ matrix.python-version }}-ubuntu-latest
           path: dist
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # push / release / workflow_dispatch: build fresh
+      # push / release / workflow_dispatch: build fresh on Linux
       - name: Set Up Python
         if: github.event_name != 'workflow_run'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Build sdist then wheel (Linux only — cross-compile not supported)
-        if: github.event_name != 'workflow_run' && matrix.os == 'ubuntu-latest'
+      - name: Build wheel
+        if: github.event_name != 'workflow_run'
         run: |
           git submodule update --init --recursive
           pip install auditwheel build setuptools
@@ -156,64 +158,50 @@ jobs:
           cd spotfire-*
           python -m build --wheel
           auditwheel repair -w ../dist --plat manylinux2014_x86_64 dist/*.whl
-      - name: Skip Windows wheel (cannot cross-compile)
-        if: github.event_name != 'workflow_run' && matrix.os == 'windows-latest'
-        run: echo "Windows wheels cannot be cross-compiled on Linux; skipping build."
 
-      - name: Check wheel exists
-        id: wheel_check
+      # Install wheel into isolated venv so Trivy detects all installed packages
+      - name: Install wheel into scan-env
         run: |
-          if ls dist/spotfire-*.whl 1>/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Unpack wheel
-        if: steps.wheel_check.outputs.exists == 'true'
-        run: |
-          mkdir wheel-unpacked
-          unzip -q dist/spotfire-*.whl -d wheel-unpacked
+          python -m venv scan-env
+          scan-env/bin/pip install --quiet dist/spotfire-*.whl
 
       - name: Set SBOM metadata
         id: meta
-        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           PKG_NAME=$(ls dist/spotfire-*.whl | sed 's|dist/||;s|\.whl||')
           CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "pkg_name=$PKG_NAME"                                    >> $GITHUB_OUTPUT
           echo "namespace=${{ env.SBOM_NS_BASE }}/$PKG_NAME/$CREATED" >> $GITHUB_OUTPUT
 
       - name: Install Trivy ${{ env.TRIVY_VERSION }}
-        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           curl -sSfL https://github.com/aquasecurity/trivy/releases/download/v${{ env.TRIVY_VERSION }}/trivy_${{ env.TRIVY_VERSION }}_Linux-64bit.tar.gz \
             | tar -xz trivy
           sudo mv trivy /usr/local/bin/trivy
 
+      # Scan the venv site-packages — Trivy finds all installed Python packages here
       - name: Trivy scan → raw SPDX JSON
-        if: steps.wheel_check.outputs.exists == 'true'
         run: |
-          trivy fs wheel-unpacked \
+          trivy fs scan-env/lib/python*/site-packages \
             --format spdx-json \
             --output _trivy_raw.spdx.json \
             --quiet
 
       - name: Patch SBOM metadata and strip annotations
-        if: steps.wheel_check.outputs.exists == 'true'
         run: |
           python .github/scripts/patch_sbom.py \
             --input  _trivy_raw.spdx.json \
-            --output spotfire-wheel-${{ matrix.python-version }}-${{ matrix.os }}.sbom.spdx.json \
+            --output spotfire-wheel-${{ matrix.python-version }}.sbom.spdx.json \
             --namespace "${{ steps.meta.outputs.namespace }}" \
-            --org  "${{ env.SBOM_ORG }}" \
-            --tool "trivy-${{ env.TRIVY_VERSION }}"
+            --name     "${{ steps.meta.outputs.pkg_name }}" \
+            --org      "${{ env.SBOM_ORG }}" \
+            --tool     "trivy-${{ env.TRIVY_VERSION }}"
 
       - name: Upload SBOM artifact
-        if: steps.wheel_check.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-wheel-${{ matrix.python-version }}-${{ matrix.os }}
-          path: spotfire-wheel-${{ matrix.python-version }}-${{ matrix.os }}.sbom.spdx.json
+          name: sbom-wheel-${{ matrix.python-version }}
+          path: spotfire-wheel-${{ matrix.python-version }}.sbom.spdx.json
 
   # ── 4. Attach SBOMs to GitHub Release ──────────────────────────────────────
   attach-to-release:
