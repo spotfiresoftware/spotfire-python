@@ -35,7 +35,7 @@ jobs:
     outputs:
       python-versions: ${{ steps.dynamic.outputs.pythons }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Read python-versions
         id: dynamic
         run: |
@@ -48,14 +48,14 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive   # needed for vendor/sbdf-c when building/installing sdist
 
       # workflow_run: reuse artifact from build.yaml — no rebuild
       - name: Download sdist (from workflow_run)
         if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: sdist
           path: dist
@@ -64,7 +64,7 @@ jobs:
 
       # push / release / workflow_dispatch: build fresh
       - name: Set Up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
       - name: Build sdist
@@ -118,7 +118,7 @@ jobs:
             --tool     "trivy-${{ env.TRIVY_VERSION }}"
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-sdist
           path: spotfire-sdist.sbom.spdx.json
@@ -133,14 +133,14 @@ jobs:
         python-version: ${{ fromJson(needs.setup.outputs.python-versions) }}
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive   # needed for vendor/sbdf-c when building wheel fresh
 
       # workflow_run: reuse the ubuntu wheel artifact from build.yaml — no rebuild
       - name: Download wheel (from workflow_run)
         if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: wheel-${{ matrix.python-version }}-ubuntu-latest
           path: dist
@@ -150,7 +150,7 @@ jobs:
       # Also download the sdist so scan-env can install from it (wheel is platform-specific)
       - name: Download sdist (from workflow_run)
         if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: sdist
           path: dist
@@ -160,7 +160,7 @@ jobs:
       # push / release / workflow_dispatch: build fresh on Linux
       - name: Set Up Python
         if: github.event_name != 'workflow_run'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Build wheel
@@ -221,7 +221,7 @@ jobs:
             --tool     "trivy-${{ env.TRIVY_VERSION }}"
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-wheel-${{ matrix.python-version }}
           path: spotfire-wheel-${{ matrix.python-version }}.sbom.spdx.json
@@ -234,7 +234,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all SBOM artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: sbom-*
           path: all-sboms

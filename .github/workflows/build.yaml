@@ -1,15 +1,20 @@
 name: Build and Test Package
 on: [push, pull_request]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   build-sdist:
     name: Build Source Dist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Set Up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
       - name: Install Tools
@@ -18,11 +23,11 @@ jobs:
       - name: Source Packaging
         run: |
           python -m build --sdist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: 'dist/spotfire-*.tar.gz'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: test-files
           path: |
@@ -50,12 +55,12 @@ jobs:
         operating-system: ['ubuntu-latest', 'windows-latest']
       fail-fast: false
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: sdist
           path: dist
       - name: Set Up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Build Requirements
@@ -81,7 +86,7 @@ jobs:
           python -m build --wheel
           # Move wheel out of build dir into top-level dist dir 
           mv dist\*.whl ..\dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
           path: 'dist/spotfire-*.whl'
@@ -96,16 +101,16 @@ jobs:
         test-environment: ${{ fromJson(needs.build-sdist.outputs.test-environments) }}
       fail-fast: false
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
           path: dist
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: test-files
           path: test-files
       - name: Set Up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies (Linux)
@@ -122,7 +127,7 @@ jobs:
         env:
           TEST_FILES_DIR: ${{ github.workspace }}/test-files/spotfire/test/files
           TEST_ENVIRONMENT: ${{ matrix.test-environment }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: ${{ always() }}
         with:
           name: test-results-${{ matrix.python-version }}-${{ matrix.operating-system }}-${{ matrix.test-environment }}
@@ -138,14 +143,14 @@ jobs:
           echo -n "python-version="  >> $GITHUB_OUTPUT
           echo '${{ needs.build-sdist.outputs.python-versions }}' | sed -e 's/[^"]*"//' -e 's/".*//' >> $GITHUB_OUTPUT
       - name: Set Up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ steps.version.outputs.python-version }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: sdist
           path: dist
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wheel-${{ steps.version.outputs.python-version }}-ubuntu-latest
           path: dist
@@ -163,3 +168,35 @@ jobs:
           mypy spotfire
           cython-lint spotfire vendor
           find spotfire -name '*_helpers.[ch]' | xargs cpplint --repository=.
+  asan:
+    name: AddressSanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: |
+          pip install setuptools Cython "numpy>=2.0.0rc1"
+          pip install ".[polars]"
+          pip install html-testRunner polars pillow
+      - name: Rebuild extension with AddressSanitizer
+        env:
+          CFLAGS: "-fsanitize=address -fno-omit-frame-pointer -g"
+          LDFLAGS: "-fsanitize=address"
+        run: python setup.py build_ext --inplace
+      - name: Run tests under AddressSanitizer
+        run: |
+          LIBASAN=$(gcc -print-file-name=libasan.so)
+          LD_PRELOAD="$LIBASAN" PYTHONMALLOC=malloc python -m spotfire.test
+        env:
+          ASAN_OPTIONS: "detect_leaks=0:allocator_may_return_null=1:intercept_cxx_exceptions=0"
+          TEST_ENVIRONMENT: asan
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results-asan
+          path: build/test-results/*.html
