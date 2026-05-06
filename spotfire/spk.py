@@ -1021,7 +1021,7 @@ def _handle_versioning(package_builder: _PackageBuilder, installed_packages: _In
     # Handle versioned filenames
     if versioned_filename:
         package_builder.output = re.sub(r"(\.spk)?$", fr"-{str(package_builder.version)}\1",
-                                        package_builder.output, 1)
+                                        package_builder.output, count=1)
 
 
 def _should_increment_major(old_packages: _InstalledPackages, new_packages: _InstalledPackages, force: bool) -> bool:
