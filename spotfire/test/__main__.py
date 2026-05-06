@@ -28,15 +28,15 @@ def load_tests(loader, tests, pattern):  # pylint: disable=unused-argument
 
 PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 TEST_ENVIRONMENT = os.getenv("TEST_ENVIRONMENT")
-REPORT_SUFFIX = ""
-REPORT_NAME = f"{platform.system().lower()}-{PYTHON_VERSION}"
+report_suffix = ""
+report_name = f"{platform.system().lower()}-{PYTHON_VERSION}"
 if TEST_ENVIRONMENT:
-    REPORT_SUFFIX = f" ({TEST_ENVIRONMENT} test environment)"
-    REPORT_NAME += f"-{TEST_ENVIRONMENT}"
+    report_suffix = f" ({TEST_ENVIRONMENT} test environment)"
+    report_name += f"-{TEST_ENVIRONMENT}"
 runner = HtmlTestRunner.HTMLTestRunner(combine_reports=True,
                                        output="build/test-results/",
                                        template=utils.get_test_data_file("template.html.in"),
-                                       report_title=f"Python {PYTHON_VERSION} on {platform.system()}{REPORT_SUFFIX}",
-                                       report_name=REPORT_NAME,
+                                       report_title=f"Python {PYTHON_VERSION} on {platform.system()}{report_suffix}",
+                                       report_name=report_name,
                                        add_timestamp=False)
 unittest.main(testRunner=runner, failfast=False, buffer=False, catchbreak=False)
