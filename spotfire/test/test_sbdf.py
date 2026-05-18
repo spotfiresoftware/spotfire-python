@@ -11,9 +11,19 @@ import os
 import pandas as pd
 import pandas.testing as pdtest
 import numpy as np
-import geopandas as gpd
-import matplotlib.pyplot
-import seaborn
+try:
+    import geopandas as gpd  # type: ignore[import-not-found]
+except ImportError:
+    gpd = None  # type: ignore[assignment]
+try:
+    import matplotlib  # type: ignore[import-not-found]
+    import matplotlib.pyplot
+except ImportError:
+    matplotlib = None  # type: ignore[assignment]
+try:
+    import seaborn  # type: ignore[import-not-found]
+except ImportError:
+    seaborn = None  # type: ignore[assignment]
 import PIL.Image
 from packaging import version
 
@@ -137,6 +147,7 @@ class SbdfTest(unittest.TestCase):
         self.assertEqual(dataframe.at[10000, "String"], "kiwis")
         self.assertEqual(dataframe.at[10000, "Binary"], b"\x7c\x7d\x7e\x7f")
 
+    @unittest.skipIf(gpd is None, "geopandas not installed")
     def test_read_write_geodata(self):
         """Test that geo-encoded data is properly converted to/from ``GeoDataFrame``."""
         gdf = sbdf.import_data(utils.get_test_data_file("sbdf/NACountries.sbdf"))
@@ -468,6 +479,7 @@ class SbdfTest(unittest.TestCase):
                 val = df2.at[1, 'x']
                 self.assertEqual(val, target)
 
+    @unittest.skipIf(matplotlib is None, "matplotlib not installed")
     def test_image_matplot(self):
         """Verify Matplotlib figures export properly."""
         matplotlib.pyplot.clf()
@@ -480,6 +492,7 @@ class SbdfTest(unittest.TestCase):
         else:
             self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
 
+    @unittest.skipIf(seaborn is None, "seaborn not installed")
     def test_image_seaborn(self):
         """Verify Seaborn grids export properly."""
         matplotlib.pyplot.clf()
@@ -521,6 +534,197 @@ class SbdfTest(unittest.TestCase):
             # Check dtype of the column
             self.assertEqual(dataframe["col"].dtype, "int64")
             self.assertEqual(dataframe["txt"].dtype, "object")
+
+    def test_temporal_nulls_roundtrip(self):
+        """Verify that mixed-null temporal columns survive export/import with correct positions."""
+        dt = datetime.datetime
+        d = datetime.date
+        t = datetime.time
+        td = datetime.timedelta
+
+        cases = {
+            "datetime": [dt(2020, 6, 15, 12, 0, 0), None, dt(1969, 7, 20, 20, 17, 0)],
+            "date":     [d(2020, 6, 15), None, d(1969, 7, 20)],
+            "time":     [t(12, 0, 0), None, t(20, 17, 0)],
+            "timespan": [td(days=1), None, td(seconds=30)],
+        }
+        for col_name, values in cases.items():
+            with self.subTest(type=col_name):
+                dataframe = pd.DataFrame({"x": values})
+                new_df = self._roundtrip_dataframe(dataframe)
+                self.assertFalse(pd.isnull(new_df.at[0, "x"]), "row 0 should not be null")
+                self.assertTrue(pd.isnull(new_df.at[1, "x"]), "row 1 should be null")
+                self.assertFalse(pd.isnull(new_df.at[2, "x"]), "row 2 should not be null")
+
+    def test_negative_timespans(self):
+        """Verify that negative timedelta values round-trip correctly."""
+        cases = [
+            datetime.timedelta(seconds=-1),
+            datetime.timedelta(days=-1),
+            datetime.timedelta(days=-5, seconds=300),
+            datetime.timedelta(milliseconds=-1),
+            datetime.timedelta(days=-1, seconds=86399, microseconds=999000),  # -1 ms
+        ]
+        dataframe = pd.DataFrame({"x": cases})
+        new_df = self._roundtrip_dataframe(dataframe)
+        for i, expected in enumerate(cases):
+            with self.subTest(i=i, value=expected):
+                got = new_df.at[i, "x"]
+                # SBDF has millisecond resolution; truncate expected to ms
+                expected_ms = datetime.timedelta(milliseconds=expected // datetime.timedelta(milliseconds=1))
+                self.assertEqual(got, expected_ms)
+
+    def test_pre_epoch_dates(self):
+        """Verify that dates before the Unix epoch (1970-01-01) round-trip correctly."""
+        cases = [
+            datetime.date(1, 1, 1),        # SBDF epoch
+            datetime.date(1582, 10, 4),    # day before Gregorian calendar
+            datetime.date(1969, 12, 31),   # one day before Unix epoch
+            datetime.date(1970, 1, 1),     # Unix epoch
+            datetime.date(1970, 1, 2),     # one day after Unix epoch
+            datetime.date(9999, 12, 31),   # max Python date
+        ]
+        dataframe = pd.DataFrame({"x": cases})
+        new_df = self._roundtrip_dataframe(dataframe)
+        for i, expected in enumerate(cases):
+            with self.subTest(date=expected):
+                self.assertEqual(new_df.at[i, "x"], expected)
+
+    def test_pre_epoch_datetimes(self):
+        """Verify that datetimes before the Unix epoch round-trip correctly."""
+        cases = [
+            datetime.datetime(1, 1, 1, 0, 0, 0),
+            datetime.datetime(1969, 12, 31, 23, 59, 59),
+            datetime.datetime(1969, 12, 31, 0, 0, 0),
+        ]
+        dataframe = pd.DataFrame({"x": cases})
+        new_df = self._roundtrip_dataframe(dataframe)
+        for i, expected in enumerate(cases):
+            with self.subTest(dt=expected):
+                self.assertEqual(new_df.at[i, "x"], expected)
+
+    def test_time_edge_cases(self):
+        """Verify midnight, end-of-day, and microsecond-precision time values."""
+        cases = [
+            (datetime.time(0, 0, 0),            datetime.time(0, 0, 0)),
+            (datetime.time(23, 59, 59, 999000), datetime.time(23, 59, 59, 999000)),
+            (datetime.time(12, 30, 45, 500),    datetime.time(12, 30, 45, 0)),     # sub-ms truncated
+            (datetime.time(0, 0, 0, 1000),      datetime.time(0, 0, 0, 1000)),     # 1 ms exactly
+        ]
+        for input_val, expected in cases:
+            with self.subTest(time=input_val):
+                dataframe = pd.DataFrame({"x": [input_val]})
+                new_df = self._roundtrip_dataframe(dataframe)
+                self.assertEqual(new_df.at[0, "x"], expected)
+
+    def test_all_null_temporal_columns(self):
+        """Verify that all-null columns of each temporal type export and import without error."""
+        for spotfire_type, dtype in [("DateTime", "datetime64[ms]"),
+                                     ("TimeSpan", "timedelta64[ms]")]:
+            with self.subTest(type=spotfire_type):
+                dataframe = pd.DataFrame({"x": pd.array([pd.NaT, pd.NaT, pd.NaT],  # type: ignore[call-overload]
+                                                         dtype=dtype)})
+                new_df = self._roundtrip_dataframe(dataframe)
+                self.assertEqual(len(new_df), 3)
+                self.assertTrue(new_df["x"].isna().all())
+
+    def test_numpy_datetime_with_nulls(self):
+        """Verify that numpy datetime64 columns with NaT values export and import correctly."""
+        values = pd.array([
+            pd.NaT,
+            pd.Timestamp("2020-01-01"),
+            pd.NaT,
+            pd.Timestamp("1969-07-20"),
+            pd.NaT,
+        ], dtype="datetime64[ms]")
+        dataframe = pd.DataFrame({"x": values})
+        new_df = self._roundtrip_dataframe(dataframe)
+        self.assertTrue(pd.isnull(new_df.at[0, "x"]))
+        self.assertEqual(new_df.at[1, "x"], datetime.datetime(2020, 1, 1))
+        self.assertTrue(pd.isnull(new_df.at[2, "x"]))
+        self.assertEqual(new_df.at[3, "x"], datetime.datetime(1969, 7, 20))
+        self.assertTrue(pd.isnull(new_df.at[4, "x"]))
+
+    def test_numpy_timedelta_with_nulls(self):
+        """Verify that numpy timedelta64 columns with NaT values export and import correctly."""
+        values = pd.array([  # type: ignore[call-overload]
+            pd.NaT,
+            pd.Timedelta(days=1),
+            pd.NaT,
+            pd.Timedelta(seconds=-30),
+            pd.NaT,
+        ], dtype="timedelta64[ms]")
+        dataframe = pd.DataFrame({"x": values})
+        new_df = self._roundtrip_dataframe(dataframe)
+        self.assertTrue(pd.isnull(new_df.at[0, "x"]))
+        self.assertEqual(new_df.at[1, "x"], datetime.timedelta(days=1))
+        self.assertTrue(pd.isnull(new_df.at[2, "x"]))
+        self.assertEqual(new_df.at[3, "x"], datetime.timedelta(seconds=-30))
+        self.assertTrue(pd.isnull(new_df.at[4, "x"]))
+
+    def test_empty_dataframe(self):
+        """Verify 0-row DataFrames export and import correctly for all column types.
+
+        Exercises the zero-size array code paths that boundscheck=False leaves unchecked,
+        ensuring no off-by-one occurs at the loop boundary when row_count is 0.
+        """
+        cases = [
+            ("bool",            pd.DataFrame({"x": pd.array([], dtype="bool")})),
+            ("int64",           pd.DataFrame({"x": pd.array([], dtype="int64")})),
+            ("float64",         pd.DataFrame({"x": pd.array([], dtype="float64")})),
+            ("datetime64[ms]",  pd.DataFrame({"x": pd.array([], dtype="datetime64[ms]")})),
+            ("timedelta64[ms]", pd.DataFrame({"x": pd.array([], dtype="timedelta64[ms]")})),
+        ]
+        for label, dataframe in cases:
+            with self.subTest(dtype=label):
+                new_df = self._roundtrip_dataframe(dataframe)
+                self.assertEqual(len(new_df), 0)
+                self.assertIn("x", new_df.columns)
+        # String requires an explicit type annotation when the column is empty (no values to infer from)
+        str_df = pd.DataFrame({"x": pd.Series([], dtype=object)})
+        spotfire.set_spotfire_types(str_df, {"x": "String"})
+        with self.subTest(dtype="string"):
+            new_df = self._roundtrip_dataframe(str_df)
+            self.assertEqual(len(new_df), 0)
+            self.assertIn("x", new_df.columns)
+
+    def test_multichunk_export(self):
+        """Verify exports spanning multiple SBDF row slices produce correct values.
+
+        The default slice size is ``100_000 // num_columns`` rows, so a 100_001-row
+        single-column DataFrame forces a second slice (start=100_000, count=1).
+        This exercises direct ``[start+i]`` indexing and pointer arithmetic for
+        precomputed int64 paths, both unchecked under boundscheck=False.
+        """
+        n = 100_001
+        # time column
+        times = [datetime.time(0, 0, 0)] * n
+        times[-1] = datetime.time(23, 59, 58)
+        dataframe = pd.DataFrame({"t": times})
+        new_df = self._roundtrip_dataframe(dataframe)
+        self.assertEqual(len(new_df), n)
+        self.assertEqual(new_df.at[0, "t"], datetime.time(0, 0, 0))
+        self.assertEqual(new_df.at[n - 1, "t"], datetime.time(23, 59, 58))
+        # date column
+        dates = [datetime.date(2000, 1, 1)] * n
+        dates[-1] = datetime.date(1969, 7, 20)
+        dataframe = pd.DataFrame({"d": dates})
+        new_df = self._roundtrip_dataframe(dataframe)
+        self.assertEqual(new_df.at[n - 1, "d"], datetime.date(1969, 7, 20))
+        # datetime64[ms] column
+        dts = pd.array([pd.Timestamp("2000-01-01")] * n, dtype="datetime64[ms]")
+        dts[n - 1] = pd.Timestamp("1969-07-20")
+        dataframe = pd.DataFrame({"dt": dts})
+        new_df = self._roundtrip_dataframe(dataframe)
+        self.assertEqual(new_df.at[n - 1, "dt"], datetime.datetime(1969, 7, 20))
+        # timedelta64[ms] column
+        tds = pd.array([pd.Timedelta(0)] * n, dtype="timedelta64[ms]")
+        tds[n - 1] = pd.Timedelta(seconds=-1)
+        dataframe = pd.DataFrame({"td": tds})
+        new_df = self._roundtrip_dataframe(dataframe)
+        self.assertEqual(len(new_df), n)
+        self.assertEqual(new_df.at[0, "td"], datetime.timedelta(0))
+        self.assertEqual(new_df.at[n - 1, "td"], datetime.timedelta(seconds=-1))
 
     @staticmethod
     def _roundtrip_dataframe(dataframe: typing.Any) -> pd.DataFrame:
