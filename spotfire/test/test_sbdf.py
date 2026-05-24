@@ -11,9 +11,19 @@ import os
 import pandas as pd
 import pandas.testing as pdtest
 import numpy as np
-import geopandas as gpd
-import matplotlib.pyplot
-import seaborn
+try:
+    import geopandas as gpd  # type: ignore[import-not-found]
+except ImportError:
+    gpd = None  # type: ignore[assignment]
+try:
+    import matplotlib  # type: ignore[import-not-found]
+    import matplotlib.pyplot
+except ImportError:
+    matplotlib = None  # type: ignore[assignment]
+try:
+    import seaborn  # type: ignore[import-not-found]
+except ImportError:
+    seaborn = None  # type: ignore[assignment]
 import PIL.Image
 from packaging import version
 
@@ -137,6 +147,7 @@ class SbdfTest(unittest.TestCase):
         self.assertEqual(dataframe.at[10000, "String"], "kiwis")
         self.assertEqual(dataframe.at[10000, "Binary"], b"\x7c\x7d\x7e\x7f")
 
+    @unittest.skipIf(gpd is None, "geopandas not installed")
     def test_read_write_geodata(self):
         """Test that geo-encoded data is properly converted to/from ``GeoDataFrame``."""
         gdf = sbdf.import_data(utils.get_test_data_file("sbdf/NACountries.sbdf"))
@@ -468,6 +479,7 @@ class SbdfTest(unittest.TestCase):
                 val = df2.at[1, 'x']
                 self.assertEqual(val, target)
 
+    @unittest.skipIf(matplotlib is None, "matplotlib not installed")
     def test_image_matplot(self):
         """Verify Matplotlib figures export properly."""
         matplotlib.pyplot.clf()
@@ -480,6 +492,7 @@ class SbdfTest(unittest.TestCase):
         else:
             self.fail(f"Expected PNG bytes, got {type(image)}: {image!r}")
 
+    @unittest.skipIf(seaborn is None, "seaborn not installed")
     def test_image_seaborn(self):
         """Verify Seaborn grids export properly."""
         matplotlib.pyplot.clf()
