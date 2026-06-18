@@ -165,19 +165,19 @@ class AnalyticInput:
 
         # Argument type
         if self._type == "column":
-            dataframe = dataframe[dataframe.columns[0]]
+            dataframe = dataframe[dataframe.columns[0]]  # type: ignore[assignment]
         if self._type == "value":
             value = dataframe.at[0, dataframe.columns[0]]
             if type(value).__module__ == "numpy":
-                dataframe = value.tolist()
+                dataframe = value.tolist()  # type: ignore[assignment, union-attr]
             elif type(value).__module__ == "pandas._libs.tslibs.timedeltas":
-                dataframe = value.to_pytimedelta()
+                dataframe = value.to_pytimedelta()  # type: ignore[assignment, union-attr]
             elif type(value).__module__ == "pandas._libs.tslibs.timestamps":
-                dataframe = value.to_pydatetime()
+                dataframe = value.to_pydatetime()  # type: ignore[assignment, union-attr]
             elif type(value).__module__ == "pandas._libs.tslibs.nattype":
-                dataframe = None
+                dataframe = None  # type: ignore[assignment]
             else:
-                dataframe = value
+                dataframe = value  # type: ignore[assignment]
 
         # Store to global dict
         globals_dict[self._name] = dataframe

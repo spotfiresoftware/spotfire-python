@@ -18,6 +18,11 @@ import PIL.Image
 from packaging import version
 
 import spotfire
+
+try:
+    import polars as pl  # type: ignore[import-not-found]
+except ImportError:
+    pl = None  # type: ignore[assignment]
 from spotfire import sbdf
 from spotfire.test import utils
 
@@ -90,18 +95,20 @@ class SbdfTest(unittest.TestCase):
                                                       "Double", "DateTime", "Date", "Time",
                                                       "TimeSpan", "String", "Decimal", "Binary"])
 
-        self.assertEqual(dataframe.get("Boolean")[0:6].tolist(), [False, True, None, False, True, None])
-        self.assertEqual(dataframe.get("Integer")[0:6].dropna().tolist(), [69.0, 73.0, 75.0, 79.0])
-        self.assertEqual(dataframe.get("Long")[0:6].dropna().tolist(), [72.0, 74.0, 78.0, 80.0])
-        for i, j in zip(dataframe.get("Float")[0:9].dropna().tolist(),
+        self.assertEqual(dataframe.get("Boolean")[0:6].tolist(),  # type: ignore[index]
+                         [False, True, None, False, True, None])
+        self.assertEqual(dataframe.get("Integer")[0:6].dropna().tolist(),  # type: ignore[index]
+                         [69.0, 73.0, 75.0, 79.0])
+        self.assertEqual(dataframe.get("Long")[0:6].dropna().tolist(), [72.0, 74.0, 78.0, 80.0])  # type: ignore[index]
+        for i, j in zip(dataframe.get("Float")[0:9].dropna().tolist(),  # type: ignore[index]
                         [12.0, 12.333333, 13.0, 13.333333, 13.666667, 14.0, 14.333333]):
             self.assertAlmostEqual(i, j)
-        for i, j in zip(dataframe.get("Double")[0:9].dropna().tolist(),
+        for i, j in zip(dataframe.get("Double")[0:9].dropna().tolist(),  # type: ignore[index]
                         [116.18, 122.46, 125.6, 128.74, 131.88, 135.02]):
             self.assertAlmostEqual(i, j)
-        self.assertEqual(dataframe.get("String")[0:5].tolist(),
+        self.assertEqual(dataframe.get("String")[0:5].tolist(),  # type: ignore[index]
                          ["The", "quick", None, None, "jumps"])
-        self.assertEqual(dataframe.get("Decimal")[0:4].tolist(),
+        self.assertEqual(dataframe.get("Decimal")[0:4].tolist(),  # type: ignore[index]
                          [decimal.Decimal("1438.1565"), None, None, decimal.Decimal("1538.493")])
 
     def test_read_10001(self):
@@ -128,8 +135,8 @@ class SbdfTest(unittest.TestCase):
         self.assertEqual(dataframe.at[10000, "Boolean"], True)
         self.assertTrue(pd.isnull(dataframe.at[10000, "Integer"]))
         self.assertEqual(dataframe.at[10000, "Long"], 19118)
-        self.assertAlmostEqual(dataframe.at[10000, "Float"], 3042.33325195313)
-        self.assertAlmostEqual(dataframe.at[10000, "Double"], 28661.92)
+        self.assertAlmostEqual(dataframe.at[10000, "Float"], 3042.33325195313)  # type: ignore[misc, arg-type]
+        self.assertAlmostEqual(dataframe.at[10000, "Double"], 28661.92)  # type: ignore[misc, arg-type]
         self.assertEqual(dataframe.at[10000, "DateTime"], datetime.datetime(1583, 11, 1, 0, 0))
         self.assertEqual(dataframe.at[10000, "Date"], datetime.date(1583, 11, 1))
         self.assertEqual(dataframe.at[10000, "Time"], datetime.time(21, 25, 40))
@@ -504,6 +511,22 @@ class SbdfTest(unittest.TestCase):
         else:
             self.fail(f"Expected PNG bytes, got {type(val)}: {val!r}")
 
+    def test_export_dict_of_lists(self):
+        """Exporting a dict of lists should produce a valid SBDF file."""
+        data = {"ints": [1, 2, 3], "floats": [1.1, 2.2, 3.3], "strings": ["a", "b", "c"]}
+        result = self._roundtrip_dataframe(data)
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result["ints"].dropna().astype(int).tolist(), [1, 2, 3])
+        self.assertAlmostEqual(result["floats"][0], 1.1)
+        self.assertEqual(result["strings"].tolist(), ["a", "b", "c"])
+
+    def test_export_list(self):
+        """Exporting a plain Python list should produce a single-column SBDF file."""
+        result = self._roundtrip_dataframe([10, 20, 30])
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result.columns[0], "x")
+        self.assertEqual(result["x"].dropna().astype(int).tolist(), [10, 20, 30])
+
     def test_export_import_unicode_path(self):
         """Test export and import with a Unicode file path."""
         dataframe = pd.DataFrame({"col": [1, 2, 3], "txt": ["a", "b", "c"]})
@@ -539,3 +562,410 @@ class SbdfTest(unittest.TestCase):
     def _assert_is_png_image(self, expr: bytes) -> None:
         """Assert that a bytes object represents PNG image data."""
         self.assertEqual(expr[0:8], b'\x89PNG\x0d\x0a\x1a\x0a')
+
+
+@unittest.skipIf(pl is None, "polars not installed")
+class SbdfPolarsTest(unittest.TestCase):
+    """Unit tests for Polars DataFrame support in 'spotfire.sbdf' module."""
+    # pylint: disable=too-many-public-methods
+
+    def test_write_polars_basic(self):
+        """Exporting a Polars DataFrame with common types should produce a valid SBDF file."""
+        polars_df = pl.DataFrame({
+            "flag": [True, False, True],
+            "count": [1, 2, 3],
+            "value": [1.1, 2.2, 3.3],
+            "label": ["a", "b", "c"],
+        })
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/output.sbdf"
+            sbdf.export_data(polars_df, path)
+            result = sbdf.import_data(path)
+        self.assertEqual(len(result), 3)
+        self.assertEqual(list(result.columns), ["flag", "count", "value", "label"])
+        self.assertEqual(result["flag"].tolist(), [True, False, True])
+        self.assertEqual(result["count"].dropna().astype(int).tolist(), [1, 2, 3])
+        self.assertAlmostEqual(result["value"][0], 1.1)
+        self.assertEqual(result["label"].tolist(), ["a", "b", "c"])
+
+    def test_write_polars_nulls(self):
+        """Exporting a Polars DataFrame with null values should preserve nulls."""
+        polars_df = pl.DataFrame({
+            "ints": [1, None, 3],
+            "floats": [1.0, None, 3.0],
+            "strings": ["x", None, "z"],
+        })
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/output.sbdf"
+            sbdf.export_data(polars_df, path)
+            result = sbdf.import_data(path)
+        self.assertTrue(pd.isnull(result["ints"][1]))
+        self.assertTrue(pd.isnull(result["floats"][1]))
+        self.assertTrue(pd.isnull(result["strings"][1]))
+
+    def test_write_polars_series(self):
+        """Exporting a Polars Series should produce a valid SBDF file."""
+        series = pl.Series("vals", [10, 20, 30])
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/output.sbdf"
+            sbdf.export_data(series, path)
+            result = sbdf.import_data(path)
+        self.assertEqual(len(result), 3)
+        self.assertEqual(result.columns[0], "vals")
+        self.assertEqual(result["vals"].dropna().astype(int).tolist(), [10, 20, 30])
+
+    def test_import_as_polars(self):
+        """Importing an SBDF file with output_format=OutputFormat.POLARS should return a native Polars DataFrame."""
+        dataframe = sbdf.import_data(utils.get_test_data_file("sbdf/1.sbdf"), output_format=sbdf.OutputFormat.POLARS)
+        self.assertIsInstance(dataframe, pl.DataFrame)
+        self.assertNotIsInstance(dataframe, pd.DataFrame)
+        self.assertIn("Boolean", dataframe.columns)
+        self.assertIn("Integer", dataframe.columns)
+        # Verify nulls are preserved natively
+        self.assertIsNone(dataframe["Long"][0])
+
+    def test_write_polars_categorical(self):
+        """Exporting a Polars Categorical column should export as String."""
+        polars_df = pl.DataFrame({"cat": pl.Series(["a", "b", "a"]).cast(pl.Categorical)})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/output.sbdf"
+            sbdf.export_data(polars_df, path)
+            result = sbdf.import_data(path)
+        self.assertEqual(result["cat"].tolist(), ["a", "b", "a"])
+
+    def test_write_polars_uint64_warns(self):
+        """Exporting a Polars UInt64 column should emit a warning about overflow risk."""
+        polars_df = pl.DataFrame({"big": pl.Series([1, 2, 3], dtype=pl.UInt64)})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/output.sbdf"
+            with self.assertWarns(sbdf.SBDFWarning):
+                sbdf.export_data(polars_df, path)
+
+    def test_write_polars_datetime_tz(self):
+        """Exporting a timezone-aware Polars Datetime column should warn about timezone loss."""
+        polars_df = pl.DataFrame({
+            "ts": pl.Series([datetime.datetime(2024, 1, 1)]).dt.replace_time_zone("UTC")
+        })
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/output.sbdf"
+            with self.assertWarns(sbdf.SBDFWarning):
+                sbdf.export_data(polars_df, path)
+
+    def test_polars_roundtrip(self):
+        """A Polars DataFrame should survive an export/import roundtrip."""
+        original = pl.DataFrame({
+            "integers": [1, 2, 3],
+            "floats": [1.5, 2.5, 3.5],
+            "strings": ["foo", "bar", "baz"],
+        })
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/roundtrip.sbdf"
+            sbdf.export_data(original, path)
+            result = sbdf.import_data(path, output_format=sbdf.OutputFormat.POLARS)
+        self.assertIsInstance(result, pl.DataFrame)
+        self.assertEqual(result["strings"].to_list(), ["foo", "bar", "baz"])
+        self.assertAlmostEqual(result["floats"][0], 1.5)
+
+    def test_invalid_output_format(self):
+        """Passing an unknown output_format should raise SBDFError immediately."""
+        polars_df = pl.DataFrame({"x": [1, 2, 3]})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/output.sbdf"
+            sbdf.export_data(polars_df, path)
+            with self.assertRaises(sbdf.SBDFError):
+                sbdf.import_data(path, output_format="numpy")  # type: ignore[call-overload]
+
+    def test_write_polars_empty(self):
+        """Exporting an empty Polars DataFrame should produce a valid (empty) SBDF file."""
+        polars_df = pl.DataFrame({"a": pl.Series([], dtype=pl.Int32),
+                                  "b": pl.Series([], dtype=pl.Utf8)})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/empty.sbdf"
+            sbdf.export_data(polars_df, path)
+            result = sbdf.import_data(path)
+        self.assertEqual(len(result), 0)
+        self.assertIn("a", result.columns)
+        self.assertIn("b", result.columns)
+
+    def test_write_polars_series_nulls(self):
+        """Exporting a Polars Series with null values should preserve those nulls."""
+        series = pl.Series("vals", [1, None, 3], dtype=pl.Int32)
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/series_nulls.sbdf"
+            sbdf.export_data(series, path)
+            result = sbdf.import_data(path)
+        self.assertTrue(pd.isnull(result["vals"][1]))
+        self.assertEqual(int(result["vals"][0]), 1)
+        self.assertEqual(int(result["vals"][2]), 3)
+
+    def test_polars_categorical_warns(self):
+        """Exporting a Polars Categorical column should emit a SBDFWarning."""
+        polars_df = pl.DataFrame({"cat": pl.Series(["x", "y", "x"]).cast(pl.Categorical)})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/cat_warn.sbdf"
+            with self.assertWarns(sbdf.SBDFWarning):
+                sbdf.export_data(polars_df, path)
+
+    def test_write_polars_null_dtype(self):
+        """Exporting a Polars all-null Series (dtype=Null) should produce an all-invalid column."""
+        polars_df = pl.DataFrame({"nothing": pl.Series([None, None, None])})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/null_dtype.sbdf"
+            sbdf.export_data(polars_df, path)
+            result = sbdf.import_data(path)
+        self.assertEqual(len(result), 3)
+        self.assertTrue(pd.isnull(result["nothing"][0]))
+        self.assertTrue(pd.isnull(result["nothing"][1]))
+        self.assertTrue(pd.isnull(result["nothing"][2]))
+
+    def test_write_polars_float_nan(self):
+        """NaN in a Polars float column should be treated as invalid (missing), not a real value."""
+        polars_df = pl.DataFrame({"vals": pl.Series([1.0, float("nan"), 3.0])})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/float_nan.sbdf"
+            sbdf.export_data(polars_df, path)
+            result = sbdf.import_data(path)
+        self.assertAlmostEqual(result["vals"][0], 1.0)
+        self.assertTrue(pd.isnull(result["vals"][1]))
+        self.assertAlmostEqual(result["vals"][2], 3.0)
+
+    # Date conversion correctness test
+
+    def test_date_view_equals_astype(self):
+        """The in-place epoch-shift + view conversion used in _import_build_polars_dataframe
+        should produce the same datetime64[D] values as the reference astype() path for a
+        range of dates spanning the SBDF epoch, dates before the Unix epoch, the Unix epoch
+        itself, a recent date, and the maximum representable date."""
+        sbdf_epoch_ms = 62135596800000  # ms from datetime(1,1,1) to datetime(1970,1,1)
+        test_dates = [
+            datetime.date(1, 1, 1),      # SBDF epoch — largest negative offset from Unix
+            datetime.date(1969, 12, 31), # one day before Unix epoch
+            datetime.date(1970, 1, 1),   # Unix epoch — must give day 0
+            datetime.date(1970, 1, 2),   # one day after Unix epoch
+            datetime.date(2024, 1, 15),  # arbitrary recent date
+            datetime.date(9999, 12, 31), # maximum Python date
+        ]
+        for test_date in test_dates:
+            # Reproduce the raw SBDF int64 value exactly as the C importer would produce it.
+            sbdf_ms = int(
+                (test_date - datetime.date(1, 1, 1)) / datetime.timedelta(milliseconds=1)
+            )
+            arr = np.array([sbdf_ms], dtype=np.int64)
+
+            # Apply the same in-place conversion used in _import_build_polars_dataframe.
+            arr -= sbdf_epoch_ms
+            arr //= 86400000
+            view_result = arr.view('datetime64[D]')[0]
+
+            # Reference: convert the Python date directly via astype.
+            ref_result = np.array([test_date], dtype=object).astype('datetime64[D]')[0]
+
+            self.assertEqual(
+                view_result, ref_result,
+                msg=f"Mismatch for {test_date}: view={view_result}, astype={ref_result}"
+            )
+
+    # Metadata warning tests
+
+    def test_polars_import_meta_warning(self):
+        """import_data with output_format=OutputFormat.POLARS should warn that metadata is not preserved."""
+        with self.assertWarnsRegex(sbdf.SBDFWarning, "metadata"):
+            sbdf.import_data(utils.get_test_data_file("sbdf/1.sbdf"), output_format=sbdf.OutputFormat.POLARS)
+
+    def test_polars_df_export_meta_warn(self):
+        """export_data with a Polars DataFrame should warn that metadata is not preserved."""
+        polars_df = pl.DataFrame({"x": [1, 2, 3]})
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/meta_warn.sbdf"
+            with self.assertWarnsRegex(sbdf.SBDFWarning, "metadata"):
+                sbdf.export_data(polars_df, path)
+
+    def test_polars_series_meta_export(self):
+        """export_data with a Polars Series should warn that metadata is not preserved."""
+        series = pl.Series("x", [1, 2, 3])
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/meta_warn_series.sbdf"
+            with self.assertWarnsRegex(sbdf.SBDFWarning, "metadata"):
+                sbdf.export_data(series, path)
+
+    # Metadata public-API error tests
+
+    def test_copy_metadata_polars_error(self):
+        """copy_metadata should raise TypeError with a Polars-specific message."""
+        polars_df = pl.DataFrame({"x": [1, 2, 3]})
+        with self.assertRaisesRegex(TypeError, "Polars"):
+            spotfire.copy_metadata(polars_df, polars_df)
+
+    def test_get_types_polars_error(self):
+        """get_spotfire_types should raise TypeError with a Polars-specific message."""
+        polars_df = pl.DataFrame({"x": [1, 2, 3]})
+        with self.assertRaisesRegex(TypeError, "Polars"):
+            spotfire.get_spotfire_types(polars_df)  # type: ignore[arg-type]
+
+    def test_set_types_polars_error(self):
+        """set_spotfire_types should raise TypeError with a Polars-specific message."""
+        polars_df = pl.DataFrame({"x": [1, 2, 3]})
+        with self.assertRaisesRegex(TypeError, "Polars"):
+            spotfire.set_spotfire_types(polars_df, {"x": "Integer"})  # type: ignore[arg-type]
+
+    def test_polars_string_multichunk(self):
+        """Verify Polars String exports spanning multiple SBDF row slices give correct values.
+
+        The Arrow buffer path in _export_extract_string_obj_arrow uses raw C pointer
+        arithmetic (values_buf + offsets[idx]).  A second chunk (start=100_000, count=1)
+        verifies the offset into the values buffer is computed correctly when start > 0.
+        """
+        n = 100_001
+        labels = ["a"] * n
+        labels[-1] = "sentinel"
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/multichunk.sbdf"
+            with self.assertWarns(sbdf.SBDFWarning):
+                sbdf.export_data(pl.DataFrame({"s": labels}), path)
+            result = sbdf.import_data(path)
+        self.assertEqual(len(result), n)
+        self.assertEqual(result.at[0, "s"], "a")
+        self.assertEqual(result.at[n - 1, "s"], "sentinel")
+
+    # Cross-path equivalence tests
+
+    @staticmethod
+    def _all_dtypes_polars_df():
+        """Build a canonical Polars DataFrame covering all 11 non-Decimal SBDF types.
+
+        Each column has exactly one null at a distinct row index (rotating 0–4) so every
+        row contains both valid and null values.  Non-null values cover negatives, pre-epoch
+        timestamps, edge times, and raw bytes to exercise the full value range.
+        """
+        dt = datetime.datetime
+        d = datetime.date
+        t = datetime.time
+        td = datetime.timedelta
+        return pl.DataFrame([
+            pl.Series("bool_col",     [None, True, False, True, False],
+                      dtype=pl.Boolean),
+            pl.Series("int32_col",    [1, None, -2, 3, -4],
+                      dtype=pl.Int32),
+            pl.Series("int64_col",    [1, 2_000_000_000, None, -3_000_000_000, 4],
+                      dtype=pl.Int64),
+            pl.Series("float32_col",  [1.5, -2.5, 3.5, None, 5.5],
+                      dtype=pl.Float32),
+            pl.Series("float64_col",  [1.0, -2.0, 3.0, -4.0, None],
+                      dtype=pl.Float64),
+            pl.Series("datetime_col", [None,
+                                       dt(2020, 1, 1, 12, 0, 0),
+                                       dt(1969, 7, 20, 20, 17, 0),
+                                       dt(2024, 12, 31, 23, 59, 59),
+                                       dt(1583, 1, 2, 0, 0, 0)],
+                      dtype=pl.Datetime("ms")),
+            pl.Series("date_col",     [d(2020, 1, 1), None, d(1969, 7, 20),
+                                       d(2024, 12, 31), d(1583, 1, 2)],
+                      dtype=pl.Date),
+            pl.Series("time_col",     [t(12, 0, 0), t(0, 0, 0), None, t(23, 59, 59), t(6, 30)],
+                      dtype=pl.Time),
+            pl.Series("duration_col", [td(days=1), td(seconds=30), td(days=-1), None, td(hours=2)],
+                      dtype=pl.Duration("ms")),
+            pl.Series("string_col",   ["hello", "world", "foo", "bar", None],
+                      dtype=pl.String),
+            pl.Series("binary_col",   [None, b"\x00\x01", b"\xff", b"", b"\xde\xad"],
+                      dtype=pl.Binary),
+        ])
+
+    @staticmethod
+    def _all_dtypes_pandas_df():
+        """Build the Pandas equivalent of ``_all_dtypes_polars_df()``.
+
+        Mirrors the same 5 rows, 11 columns, and null positions using Pandas nullable
+        dtypes so both DataFrames produce identical SBDF files when exported.  Float columns
+        use numpy NaN (not pd.NA) to match what the Polars export path stores for missing
+        floating-point values.
+
+        Note: ``polars.DataFrame.to_pandas()`` requires pyarrow, which is not part of the
+        required dependencies.  This helper provides the same data without that dependency.
+        """
+        dt = datetime.datetime
+        d = datetime.date
+        t = datetime.time
+        td = datetime.timedelta
+        return pd.DataFrame({
+            "bool_col":     pd.array([None, True, False, True, False],  dtype="boolean"),
+            "int32_col":    pd.array([1, None, -2, 3, -4],              dtype="Int32"),
+            "int64_col":    pd.array([1, 2_000_000_000, None, -3_000_000_000, 4], dtype="Int64"),
+            "float32_col":  np.array([1.5, -2.5, 3.5, np.nan, 5.5],    dtype="float32"),
+            "float64_col":  np.array([1.0, -2.0, 3.0, -4.0, np.nan],   dtype="float64"),
+            "datetime_col": pd.array([pd.NaT,
+                                      dt(2020, 1, 1, 12, 0, 0),
+                                      dt(1969, 7, 20, 20, 17, 0),
+                                      dt(2024, 12, 31, 23, 59, 59),
+                                      dt(1583, 1, 2, 0, 0, 0)],        dtype="datetime64[ms]"),
+            "date_col":     [d(2020, 1, 1), None, d(1969, 7, 20), d(2024, 12, 31), d(1583, 1, 2)],
+            "time_col":     [t(12, 0, 0), t(0, 0, 0), None, t(23, 59, 59), t(6, 30)],
+            "duration_col": pd.array([td(days=1), td(seconds=30), td(days=-1), pd.NaT, td(hours=2)],
+                                     dtype="timedelta64[ms]"),  # type: ignore[call-overload]
+            "string_col":   ["hello", "world", "foo", "bar", None],
+            "binary_col":   [None, b"\x00\x01", b"\xff", b"", b"\xde\xad"],
+        })
+
+    def test_all_dtypes_polars_export(self):
+        """Exporting via the native Polars path and the Pandas path should produce identical data.
+
+        The Polars DataFrame and an equivalent Pandas DataFrame (same values, same nulls) are
+        each exported to a separate SBDF file.  Both files are then imported back as Pandas and
+        compared element-wise, covering all 11 non-Decimal SBDF types with one null per column.
+        """
+        pl_df = self._all_dtypes_polars_df()
+        pd_df = self._all_dtypes_pandas_df()
+        with tempfile.TemporaryDirectory() as tempdir:
+            polars_path = f"{tempdir}/via_polars.sbdf"
+            pandas_path = f"{tempdir}/via_pandas.sbdf"
+            sbdf.export_data(pl_df, polars_path)
+            sbdf.export_data(pd_df, pandas_path)
+            pd_from_polars = sbdf.import_data(polars_path)
+            pd_from_pandas = sbdf.import_data(pandas_path)
+        pdtest.assert_frame_equal(
+            pd_from_polars, pd_from_pandas,
+            check_dtype=False, check_exact=False, rtol=1e-5,
+        )
+
+    def _assert_import_paths_equivalent(self, polars_result, pandas_result):
+        """Assert that a Polars import result and a Pandas import result contain identical data.
+
+        Uses ``Series.to_list()`` (no pyarrow required) to materialise Polars values as Python
+        objects and compares them against the corresponding Pandas column values.  Null
+        positions are verified with ``Series.is_null()`` / ``Series.isna()``, and non-null
+        float values are compared with a relative tolerance to absorb float32 representation
+        differences.
+        """
+        self.assertEqual(list(polars_result.columns), list(pandas_result.columns))
+        for col in polars_result.columns:
+            pl_series = polars_result[col]
+            pd_series = pandas_result[col]
+            pl_nulls = pl_series.is_null().to_list()
+            pd_nulls = pd_series.isna().tolist()
+            self.assertEqual(pl_nulls, pd_nulls, f"column '{col}': null positions differ")
+            pl_vals = [v for v in pl_series.to_list() if v is not None]
+            pd_vals = [v for v in pd_series.dropna().tolist() if v is not None]
+            self.assertEqual(len(pl_vals), len(pd_vals),
+                             f"column '{col}': non-null value counts differ")
+            dtype_name = pl_series.dtype.__class__.__name__
+            if dtype_name in ("Float32", "Float64"):
+                for pl_val, pdv in zip(pl_vals, pd_vals):
+                    self.assertAlmostEqual(float(pl_val), float(pdv), places=4,
+                                          msg=f"column '{col}': value mismatch")
+            else:
+                self.assertEqual(pl_vals, pd_vals, f"column '{col}': values differ")
+
+    def test_all_dtypes_polars_import(self):
+        """Importing the same SBDF via the Polars and Pandas paths should yield equivalent data.
+
+        The same SBDF file is imported twice — once as a native Polars DataFrame and once as a
+        Pandas DataFrame — then compared column by column using ``Series.to_list()`` (no
+        pyarrow required).  Covers all 11 non-Decimal SBDF types with one null per column.
+        """
+        pl_df = self._all_dtypes_polars_df()
+        with tempfile.TemporaryDirectory() as tempdir:
+            path = f"{tempdir}/source.sbdf"
+            sbdf.export_data(pl_df, path)
+            polars_result = sbdf.import_data(path, output_format=sbdf.OutputFormat.POLARS)
+            pandas_result = sbdf.import_data(path)
+        self._assert_import_paths_equivalent(polars_result, pandas_result)

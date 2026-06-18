@@ -148,6 +148,36 @@ sbdf_object *_export_extract_string_obj(PyObject *vals, PyObject *invalids, Py_s
     return t;
 }
 
+sbdf_object *_export_extract_string_obj_arrow(const char *values_buf, const int64_t *offsets,
+                                               const unsigned char *invalids,
+                                               Py_ssize_t start, Py_ssize_t count) {
+    sbdf_object *t = calloc(1, sizeof(sbdf_object));
+    if (!t) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    t->type = sbdf_vt_string();
+    t->count = (int)count;
+    char **data = (char **)calloc(count, sizeof(char *));
+    if (!data) {
+        PyErr_NoMemory();
+        sbdf_obj_destroy(t);
+        return NULL;
+    }
+    t->data = data;
+    for (Py_ssize_t i = 0; i < count; i++) {
+        Py_ssize_t idx = start + i;
+        if (invalids[idx]) {
+            data[i] = sbdf_str_create_len("", 0);
+        } else {
+            int64_t off_start = offsets[idx];
+            int64_t off_end   = offsets[idx + 1];
+            data[i] = sbdf_str_create_len(values_buf + off_start, (int)(off_end - off_start));
+        }
+    }
+    return t;
+}
+
 sbdf_object *_export_extract_binary_obj(PyObject *vals, PyObject *invalids, Py_ssize_t start, Py_ssize_t count) {
     sbdf_object *t = calloc(1, sizeof(sbdf_object));
 

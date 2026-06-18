@@ -20,7 +20,22 @@ simply `spotfire`) to include the required Python packages to support optional f
 | `spotfire[plot-matplotlib]` | Plotting support using just `matplotlib`     |
 | `spotfire[plot-pil]`        | Plotting support using just `Pillow`         |
 | `spotfire[plot-seaborn]`    | Plotting support using just `seaborn`        |
+| `spotfire[polars]`          | Polars DataFrame support                     |
 | `spotfire[dev,lint]`        | Internal development                         |
+
+Once installed, `export_data()` accepts `polars.DataFrame` and `polars.Series` directly, and
+`import_data()` can return a `polars.DataFrame`:
+
+```python
+import spotfire.sbdf as sbdf
+
+df = sbdf.import_data("data.sbdf", output_format=sbdf.OutputFormat.POLARS)
+```
+
+> **Note for Spotfire data functions:** Spotfire's bundled Python interpreter does not include
+> Polars. To use Polars inside a data function, configure Spotfire to use a custom Python
+> environment that has `polars` installed. Polars is a large binary package (~44 MB), so
+> Spotfire Packages (SPKs) that bundle it will be significantly larger than typical packages.
 
 ### License
 BSD-type 3-Clause License.  See the file ```LICENSE``` included in the package.

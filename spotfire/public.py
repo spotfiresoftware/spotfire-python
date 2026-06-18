@@ -18,6 +18,16 @@ except ImportError:
 
 _ColumnTypes = dict[str, str]
 
+_POLARS_METADATA_ERROR = (
+    "Polars DataFrames do not support Spotfire metadata; "
+    "see https://github.com/pola-rs/polars/issues/5117"
+)
+
+
+def _is_polars_type(obj) -> bool:
+    """Return True if obj is a Polars DataFrame or Series."""
+    return type(obj).__module__.startswith("polars")
+
 
 # Table and column metadata functions
 
@@ -28,6 +38,8 @@ def copy_metadata(source, destination) -> None:
     :param destination: the DataFrame or Series to copy metadata to
     :raise TypeError: if the types of source and destination do not match
     """
+    if _is_polars_type(source) or _is_polars_type(destination):
+        raise TypeError(_POLARS_METADATA_ERROR)
     # Verify that types of source and destination match
     if isinstance(source, pd.DataFrame) and not isinstance(destination, pd.DataFrame):
         raise TypeError("both source and destination must be DataFrames")
@@ -65,6 +77,8 @@ def get_spotfire_types(dataframe: pd.DataFrame) -> pd.Series:
     :param dataframe: the DataFrame to get the Spotfire types of
     :returns: a Series containing the Spotfire types of each column of dataframe
     """
+    if _is_polars_type(dataframe):
+        raise TypeError(_POLARS_METADATA_ERROR)
     if not isinstance(dataframe, pd.DataFrame):
         raise TypeError("dataframe is not a DataFrame")
     spotfire_types = {}
@@ -83,6 +97,8 @@ def set_spotfire_types(dataframe: pd.DataFrame, column_types: _ColumnTypes) -> N
     :param dataframe: the DataFrame to set the Spotfire types of
     :param column_types: dictionary that maps column names to column types
     """
+    if _is_polars_type(dataframe):
+        raise TypeError(_POLARS_METADATA_ERROR)
     if not isinstance(dataframe, pd.DataFrame):
         raise TypeError("dataframe is not a DataFrame")
     for col, spotfire_type in column_types.items():

@@ -61,9 +61,13 @@ plot-seaborn = [
     "seaborn >= 0.13.2",
 ]
 plot = [ "spotfire[plot-matplotlib,plot-pil,plot-seaborn]" ]
+# Polars support
+polars = [
+    "polars >= 0.20.0",
+]
 # Development requirements
 dev = [
-    "spotfire[geo,plot]",
+    "spotfire[geo,plot,polars]",
     "Cython >= 3.0.4",
     "html-testRunner",
 ]
@@ -289,5 +293,6 @@ plugins = ["numpy.typing.mypy_plugin"]
 module = [
     "geopandas",
     "HtmlTestRunner",
+    "polars",
 ]
 ignore_missing_imports = true
