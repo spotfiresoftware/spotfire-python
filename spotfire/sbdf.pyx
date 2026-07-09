@@ -15,7 +15,7 @@ import warnings
 import cython
 
 import spotfire
-from spotfire import _utils
+from spotfire import _utils, _metadata
 
 import numpy as np
 import pandas as pd
@@ -392,6 +392,8 @@ cdef class _ImportContext:
             return "float32"
         elif self.numpy_type_num == np_c.NPY_FLOAT64:
             return "float64"
+        elif self.value_type.id == sbdf_c.SBDF_STRINGTYPEID:
+            return "str"
         else:
             return "object"
 
@@ -782,10 +784,10 @@ def import_data(sbdf_file):
                                       name=column_names[i])
             column_series.loc[importer_contexts[i].get_invalid_array()] = None
             imported_columns.append(column_series)
-        dataframe = pd.concat(imported_columns, axis=1)
+        dataframe = pd.concat(imported_columns, axis=1, sort=False)
         for i in range(num_columns):
-            dataframe[column_names[i]].spotfire_column_metadata = column_metadata[i]
-            dataframe[column_names[i]].attrs['spotfire_type'] = importer_contexts[i].get_spotfire_type_name()
+            _metadata.set_column_metadata(dataframe, column_names[i], column_metadata[i])
+            _metadata.set_spotfire_type(dataframe, column_names[i], importer_contexts[i].get_spotfire_type_name())
         if gpd is not None and table_metadata.get('MapChart.IsGeocodingTable'):
             # Turn the DataFrame into a GeoDataFrame if geopandas was detected and the table metadata
             # indicates geocoding is present in the SBDF data
@@ -797,7 +799,7 @@ def import_data(sbdf_file):
                 geometry.append(shapely.wkb.loads(x))
             dataframe = dataframe.drop(columns='Geometry')
             gdf = gpd.GeoDataFrame(dataframe, geometry=geometry)
-            spotfire.copy_metadata(dataframe, gdf)
+            _metadata.copy_all_metadata(dataframe, gdf)
             # Determine the correct CRS to use
             if 'MapChart.GeographicCrs' in table_metadata.keys() and table_metadata['MapChart.GeographicCrs'] != "":
                 proj = table_metadata['MapChart.GeographicCrs'][0]
@@ -809,9 +811,7 @@ def import_data(sbdf_file):
                 except AttributeError:
                     pass
             dataframe = gdf
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            dataframe.spotfire_table_metadata = table_metadata
+        _metadata.set_table_metadata(dataframe, table_metadata)
         return dataframe
 
     finally:
@@ -915,45 +915,45 @@ cdef _export_obj_dataframe(obj):
     if len(set(obj.keys().to_list())) != len(obj.columns):
         raise SBDFError("obj does not have unique column names")
 
-    # Table/column metadata and column information
-    try:
-        table_metadata = obj.spotfire_table_metadata
-    except AttributeError:
-        table_metadata = {}
+    # Pre-extract metadata and dtypes before the column loop to avoid
+    # repeated df.attrs lookups.  Column access is cached in a local
+    # variable (one df[col] per column) and fillna replaces the slower
+    # replace(dict) for NA handling.
+    table_metadata = _metadata.get_table_metadata(obj)
     export_column_names = obj.columns.tolist()
+    all_dtypes = obj.dtypes
+    all_sf_types = {c: _metadata.get_spotfire_type(obj, c) for c in export_column_names}
+    all_col_meta = {c: _metadata.get_column_metadata(obj, c) for c in export_column_names}
+
     column_names = []
     column_metadata = []
     exporter_contexts = []
     for col in export_column_names:
-        if obj[col].dtype == 'geometry':
+        if all_dtypes[col] == 'geometry':
             # Special case for the 'geometry' dtype from geopandas
             _export_obj_geodataframe_geometry(obj[col], obj.crs, table_metadata, column_names, column_metadata,
                                               exporter_contexts)
         else:
             # Normal columns
             column_names.append(col)
+            series = obj[col]
             context = _ExportContext()
-            if 'spotfire_type' in obj[col].attrs:
-                context.set_valuetype_id(_export_infer_valuetype_from_spotfire_typename(obj[col], f"column '{col}'"))
+            sf_type = all_sf_types[col]
+            if sf_type is not None:
+                context.set_valuetype_id(
+                    _export_infer_valuetype_from_spotfire_typename(series, f"column '{col}'", sf_type))
             else:
-                context.set_valuetype_id(_export_infer_valuetype_from_pandas_dtype(obj[col], f"column '{col}'"))
+                context.set_valuetype_id(_export_infer_valuetype_from_pandas_dtype(series, f"column '{col}'"))
             na_value = context.get_numpy_na_value()
-            nas = {None: na_value,
-                   np.nan: na_value,
-                   pd.NA: na_value,
-                   pd.NaT: na_value,
-                   }
-            if obj[col].dtype == "object":
-                values = obj[col].replace(nas).to_numpy()
+            invalids = pd.isnull(series)
+            numpy_dtype = context.get_numpy_dtype()
+            if numpy_dtype is not None:
+                values = series.fillna(na_value).to_numpy(dtype=numpy_dtype, copy=False)
             else:
-                values = obj[col].replace(nas).to_numpy(dtype=context.get_numpy_dtype())
-            invalids = pd.isnull(obj[col])
+                values = series.fillna(na_value).to_numpy(copy=False)
             context.set_arrays(values, invalids)
             exporter_contexts.append(context)
-            try:
-                column_metadata.append(obj[col].spotfire_column_metadata)
-            except AttributeError:
-                column_metadata.append({})
+            column_metadata.append(all_col_meta[col])
 
     return table_metadata, column_names, column_metadata, exporter_contexts
 
@@ -1016,16 +1016,14 @@ cdef _export_obj_series(obj, default_column_name):
 
     # Column metadata and information
     context = _ExportContext()
-    if 'spotfire_type' in obj.attrs:
-        context.set_valuetype_id(_export_infer_valuetype_from_spotfire_typename(obj, description))
+    sf_type = _metadata.get_spotfire_type(obj, column_name)
+    if sf_type is not None:
+        context.set_valuetype_id(_export_infer_valuetype_from_spotfire_typename(obj, description, sf_type))
     else:
         context.set_valuetype_id(_export_infer_valuetype_from_pandas_dtype(obj, description))
     context.set_arrays(obj.to_numpy(context.get_numpy_dtype(), na_value=context.get_numpy_na_value()),
                        _export_infer_invalids(obj))
-    try:
-        column_metadata = obj.spotfire_column_metadata
-    except AttributeError:
-        column_metadata = {}
+    column_metadata = _metadata.get_column_metadata(obj, column_name)
 
     return {}, [column_name], [column_metadata], [context]
 
@@ -1537,7 +1535,7 @@ cdef int _export_infer_valuetype_from_pandas_dtype(series, series_description):
         return sbdf_c.SBDF_DATETIMETYPEID
     elif dtype.startswith("timedelta64["):
         return sbdf_c.SBDF_TIMESPANTYPEID
-    elif dtype == "string":
+    elif dtype in ("string", "str") or dtype.startswith("string["):
         return sbdf_c.SBDF_STRINGTYPEID
     else:
         raise SBDFError(f"unknown dtype '{dtype}' in {series_description}")
@@ -1548,16 +1546,15 @@ cdef object _VT_CONVERSIONS_NUMERIC = [sbdf_c.SBDF_BOOLTYPEID, sbdf_c.SBDF_INTTY
                                        sbdf_c.SBDF_FLOATTYPEID, sbdf_c.SBDF_DOUBLETYPEID]
 
 
-cdef int _export_infer_valuetype_from_spotfire_typename(series, series_description):
+cdef int _export_infer_valuetype_from_spotfire_typename(series, series_description, typename):
     """Determine a value type for a data set based on the name of the Spotfire type.
 
     :param series: the values to infer the value type of
     :param series_description: description of series (for error reporting)
+    :param typename: the Spotfire type name
     :return: the integer value type id representing the type of series
     :raise SBDFError: if the types of series are inconvertible, mixed, all missing, or unknown
     """
-    # Determine if a type has been specified.
-    typename = series.attrs['spotfire_type']
     specified_vt = spotfire_typename_to_valuetype_id(typename)
 
     # Verify the specified type is allowed to be converted from.

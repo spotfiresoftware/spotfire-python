@@ -14,12 +14,11 @@ description = "Package for Building Python Extensions to Spotfire"
 readme = "README.md"
 authors = [{ name = "Cloud Software Group, Inc." }]
 maintainers = [{ name="Spotfire Python Package Support", email = "spotfirepython@tibco.com" }]
-requires-python = ">= 3.9"
+requires-python = ">= 3.11"
 dependencies = [
     # DataFrame support
-    "pandas >= 2.2.2, < 3.0.0",
-    "numpy >= 1.23.5; python_version < '3.12'",
-    "numpy >= 1.26.0; python_version >= '3.12'",
+    "pandas >= 3.0.0",
+    "numpy >= 1.26.0",
     # Package interactions
     "packaging",
     "pip >= 21.2",
@@ -32,8 +31,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -102,7 +99,7 @@ jobs = 1
 limit-inference-results = 100
 # load-plugins =
 persistent = true
-py-version = "3.9"
+py-version = "3.11"
 # recursive =
 # source-roots =
 # unsafe-load-any-extension =

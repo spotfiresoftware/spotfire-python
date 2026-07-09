@@ -13,7 +13,9 @@ import types
 import typing
 import re
 
-from spotfire import sbdf, _utils
+import pandas as pd
+
+from spotfire import sbdf, _utils, _metadata
 
 
 _ExceptionInfo = typing.Union[
@@ -131,12 +133,10 @@ class AnalyticInput:
         debug_fn(f"read {dataframe.shape[0]} rows {dataframe.shape[1]} columns")
 
         # Table metadata
-        try:
-            if dataframe.spotfire_table_metadata:
-                table_meta = f"\n {pprint.pformat(dataframe.spotfire_table_metadata)}"
-            else:
-                table_meta = " (no table metadata present)"
-        except AttributeError:
+        table_md = _metadata.get_table_metadata(dataframe)
+        if table_md:
+            table_meta = f"\n {pprint.pformat(table_md)}"
+        else:
             table_meta = " (no table metadata present)"
         debug_fn(f"table metadata:{table_meta}")
 
@@ -144,15 +144,13 @@ class AnalyticInput:
         column_blank = False
         pretty_column = io.StringIO()
         for col in dataframe.columns:
-            try:
-                if pretty_column.tell() > _COLUMN_METADATA_TRUNCATE_THRESHOLD:
-                    pretty_column.write("\n (truncated due to length)")
-                    break
-                if dataframe[col].spotfire_column_metadata:
-                    pretty_column.write(f"\n {col}: {pprint.pformat(dataframe[col].spotfire_column_metadata)}")
-                else:
-                    column_blank = True
-            except AttributeError:
+            if pretty_column.tell() > _COLUMN_METADATA_TRUNCATE_THRESHOLD:
+                pretty_column.write("\n (truncated due to length)")
+                break
+            col_md = _metadata.get_column_metadata(dataframe, col)
+            if col_md:
+                pretty_column.write(f"\n {col}: {pprint.pformat(col_md)}")
+            else:
                 column_blank = True
         if pretty_column.tell():
             column_meta = pretty_column.getvalue()
@@ -168,14 +166,14 @@ class AnalyticInput:
             dataframe = dataframe[dataframe.columns[0]]
         if self._type == "value":
             value = dataframe.at[0, dataframe.columns[0]]
-            if type(value).__module__ == "numpy":
-                dataframe = value.tolist()
-            elif type(value).__module__ == "pandas._libs.tslibs.timedeltas":
-                dataframe = value.to_pytimedelta()
-            elif type(value).__module__ == "pandas._libs.tslibs.timestamps":
+            if isinstance(value, pd.Timestamp):
                 dataframe = value.to_pydatetime()
-            elif type(value).__module__ == "pandas._libs.tslibs.nattype":
+            elif isinstance(value, pd.Timedelta):
+                dataframe = value.to_pytimedelta()
+            elif pd.isna(value):
                 dataframe = None
+            elif type(value).__module__ == "numpy":
+                dataframe = value.tolist()
             else:
                 dataframe = value
 

@@ -5,12 +5,11 @@ import os
 import os.path
 import sys
 import unittest
-import warnings
 
 import pandas as pd
 import pandas.testing as pdtest
 
-from spotfire import sbdf, data_function as datafn, _utils
+from spotfire import sbdf, data_function as datafn, _utils, _metadata
 from spotfire.test import utils as testutils
 
 
@@ -115,15 +114,13 @@ class DataFunctionTest(unittest.TestCase):
                         data_frame = sbdf.import_data(output.file)
                         print(data_frame)
                         pdtest.assert_frame_equal(outputs[output.name], data_frame)
-                        try:
-                            print(f"test: table metadata:\n{data_frame.spotfire_table_metadata!r}")
-                        except AttributeError:
-                            pass
+                        table_md = _metadata.get_table_metadata(data_frame)
+                        if table_md:
+                            print(f"test: table metadata:\n{table_md!r}")
                         for col in data_frame.columns:
-                            try:
-                                print(f"test: column '{col}' metadata:\n{data_frame[col].spotfire_column_metadata!r}")
-                            except AttributeError:
-                                pass
+                            col_md = _metadata.get_column_metadata(data_frame, col)
+                            if col_md:
+                                print(f"test: column '{col}' metadata:\n{col_md!r}")
                         self._assert_table_metadata_equal(outputs[output.name], data_frame)
                     except AssertionError:
                         raise
@@ -143,28 +140,14 @@ class DataFunctionTest(unittest.TestCase):
 
     def _assert_table_metadata_equal(self, first, second, msg=None):
         """Test that two data frames have the same metadata."""
-        # Test the table metadata
-        try:
-            first_meta = first.spotfire_table_metadata
-        except AttributeError:
-            first_meta = {}
-        try:
-            second_meta = second.spotfire_table_metadata
-        except AttributeError:
-            second_meta = {}
+        first_meta = _metadata.get_table_metadata(first)
+        second_meta = _metadata.get_table_metadata(second)
         self.assertEqual(first_meta, second_meta, msg)
 
-        # Test the column metadata
         pdtest.assert_index_equal(first.columns, second.columns)
         for col in first.columns:
-            try:
-                first_colmeta = first[col].spotfire_column_metadata
-            except AttributeError:
-                first_colmeta = {}
-            try:
-                second_colmeta = second[col].spotfire_column_metadata
-            except AttributeError:
-                second_colmeta = {}
+            first_colmeta = _metadata.get_column_metadata(first, col)
+            second_colmeta = _metadata.get_column_metadata(second, col)
             self.assertEqual(first_colmeta, second_colmeta, msg)
 
     def test_value_input(self):
@@ -302,33 +285,30 @@ print("(and this too) (E2)")""", {}, {}, True, expected)
     def test_table_metadata(self):
         """Test that table metadata goes in and comes out."""
         in1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            in1_df.spotfire_table_metadata = {  # type: ignore[attr-defined]
-                'bravo': ['The second letter of the phonetic alphabet.']
-            }
-        out_md_df = pd.DataFrame(in1_df.spotfire_table_metadata)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            out_md_df.spotfire_table_metadata = {'a': ['Alpha']}  # type: ignore[attr-defined]
+        _metadata.set_table_metadata(in1_df, {
+            'bravo': ['The second letter of the phonetic alphabet.']
+        })
+        out_md_df = pd.DataFrame(_metadata.get_table_metadata(in1_df))
+        _metadata.set_table_metadata(out_md_df, {'a': ['Alpha']})
         expected = _PythonVersionedExpectedValue("table_metadata")
         self._run_analytic("""import pandas as pd
-out_md = pd.DataFrame(in1.spotfire_table_metadata)
-out_md.spotfire_table_metadata = {'a': ['Alpha']}""", {"in1": in1_df}, {"out_md": out_md_df}, True, expected)
+import spotfire
+out_md = pd.DataFrame(spotfire.get_table_metadata(in1))
+spotfire.set_table_metadata(out_md, {'a': ['Alpha']})""", {"in1": in1_df}, {"out_md": out_md_df}, True, expected)
 
     def test_column_metadata(self):
         """Test that column metadata goes in and comes out."""
         in1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-        in1_df['a'].spotfire_column_metadata = {'a': ['Alpha']} # type: ignore[attr-defined]
+        _metadata.set_column_metadata(in1_df, 'a', {'a': ['Alpha']})
         out1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [1.0, 2.0, 3.0]})
-        out1_df['a'].spotfire_column_metadata = {'a': ['Alpha']} # type: ignore[attr-defined]
-        out1_df['b'].spotfire_column_metadata = {'b': ['Bravo']} # type: ignore[attr-defined]
+        _metadata.set_column_metadata(out1_df, 'a', {'a': ['Alpha']})
+        _metadata.set_column_metadata(out1_df, 'b', {'b': ['Bravo']})
         self._run_analytic("""import pandas as pd
 import spotfire
 b = pd.Series([1.0, 2.0, 3.0], name='b')
 out1 = pd.concat([in1, b], axis=1)
 spotfire.copy_metadata(in1, out1)
-out1['b'].spotfire_column_metadata = {'b': ['Bravo']}""", {'in1': in1_df}, {'out1': out1_df}, True, None)
+spotfire.set_column_metadata(out1, 'b', {'b': ['Bravo']})""", {'in1': in1_df}, {'out1': out1_df}, True, None)
 
     def test_column_rename(self):
         """Test that a column renamed in a data function processes correctly."""
@@ -358,10 +338,8 @@ except Exception as e:
     def test_debug_log(self):
         """Test that the debug log can be enabled"""
         in1_df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            in1_df.spotfire_table_metadata = {"tbl_1": [1]}  # type: ignore[attr-defined]
-        in1_df["a"].spotfire_column_metadata = {"col_a_1": [10]}  # type: ignore[attr-defined]
+        _metadata.set_table_metadata(in1_df, {"tbl_1": [1]})
+        _metadata.set_column_metadata(in1_df, "a", {"col_a_1": [10]})
         expected = _PythonVersionedExpectedValue("debug_log")
         self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, spec_adjust=self._debug_log)
 
@@ -374,7 +352,7 @@ except Exception as e:
 
         # Some columns have no metadata
         in2_df = pd.DataFrame({"a": [1, 2, 3, 4, 5], "b": [6, 7, 8, 9, 10]})
-        in2_df['b'].spotfire_column_metadata = {"col_b_1": [11]}  # type: ignore[attr-defined]
+        _metadata.set_column_metadata(in2_df, 'b', {"col_b_1": [11]})
         expected = _PythonVersionedExpectedValue("debug_log_omit_2")
         self._run_analytic("in2", {"in2": in2_df}, {}, True, expected, spec_adjust=self._debug_log)
 
@@ -385,7 +363,7 @@ except Exception as e:
             in1_dict[f"num{i}"] = [i, i+1, i+2]
         in1_df = pd.DataFrame(in1_dict)
         for i in range(10000):
-            in1_df[f"num{i}"].spotfire_column_metadata = {f"col_num{i}_1": [i]}  # type: ignore[attr-defined]
+            _metadata.set_column_metadata(in1_df, f"num{i}", {f"col_num{i}_1": [i]})
         expected = _PythonVersionedExpectedValue("debug_log_truncate")
         self._run_analytic("in1", {"in1": in1_df}, {}, True, expected, spec_adjust=self._debug_log)
 
