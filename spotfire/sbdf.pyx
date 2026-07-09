@@ -14,7 +14,6 @@ import warnings
 
 import cython
 
-import spotfire
 from spotfire import _utils, _metadata
 
 import numpy as np
