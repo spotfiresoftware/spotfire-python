@@ -446,7 +446,8 @@ class SbdfTest(unittest.TestCase):
         }
         for resolution, timestamp in inputs.items():
             with self.subTest(resolution=resolution):
-                array = np.array([[0], [timestamp]]).astype(f"datetime64[{resolution}]")
+                array: np.ndarray = np.array([[0], [timestamp]])
+                array = array.astype(f"datetime64[{resolution}]")
                 dataframe = pd.DataFrame(array, columns=["x"])
                 df2 = self._roundtrip_dataframe(dataframe)
                 val = df2.at[1, 'x']
@@ -463,7 +464,8 @@ class SbdfTest(unittest.TestCase):
         }
         for resolution, timestamp in inputs.items():
             with self.subTest(resolution=resolution):
-                array = np.array([[0], [timestamp]]).astype(f"timedelta64[{resolution}]")
+                array: np.ndarray = np.array([[0], [timestamp]])
+                array = array.astype(f"timedelta64[{resolution}]")
                 dataframe = pd.DataFrame(array, columns=["x"])
                 df2 = self._roundtrip_dataframe(dataframe)
                 val = df2.at[1, 'x']
