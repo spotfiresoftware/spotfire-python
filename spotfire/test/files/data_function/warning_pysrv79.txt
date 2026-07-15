@@ -1,5 +1,5 @@
 
-Standard error:
+Warnings:
 <data_function>:4: Warning: This is a Warning
 <data_function>:5: UserWarning: This is a UserWarning
 <data_function>:6: DeprecationWarning: This is a DeprecationWarning
