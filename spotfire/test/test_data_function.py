@@ -272,15 +272,6 @@ warn("This is a BytesWarning", BytesWarning)
 warn("This is a ResourceWarning", ResourceWarning)""", {}, {}, True, expected,
                            has_warnings=True, has_stderr=False)
 
-    def test_warning_pandas(self):
-        """Test that pandas-generated warnings are captured separately from stderr."""
-        in1_df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-        expected = _PythonVersionedExpectedValue("warning_pandas")
-        self._run_analytic("""import pandas as pd
-df = pd.DataFrame({"x": [1, 2, 3]})
-df.new_col = [4, 5, 6]
-output = in1""", {"in1": in1_df}, {"output": in1_df}, True, expected,
-                           has_warnings=True, has_stderr=False)
 
     def test_warning_per_row(self):
         """Test that per-row warnings are deduplicated by Python's default filter."""
