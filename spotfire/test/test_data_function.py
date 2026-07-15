@@ -274,10 +274,11 @@ warn("This is a ResourceWarning", ResourceWarning)""", {}, {}, True, expected,
 
 
     def test_warning_per_row(self):
-        """Test that per-row warnings are deduplicated by Python's default filter."""
+        """Test that unique per-row warnings are each captured individually."""
         in1_df = pd.DataFrame({"a": pd.array([1, 2, 3, 4, 5], dtype="Int64")})
         expected = _PythonVersionedExpectedValue("warning_per_row")
         self._run_analytic("""import warnings
+warnings.simplefilter("always")
 for idx, row in in1.iterrows():
     warnings.warn(f"bad value at row {idx}")
 output = in1""", {"in1": in1_df}, {"output": in1_df}, True, expected,
