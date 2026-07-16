@@ -292,8 +292,8 @@ for i in range(150):
     warnings.warn(f"warning {i}")""")
         result = spec.evaluate()
         self.assertTrue(result.has_warnings)
-        self.assertEqual(len(result.warnings), 101)
-        self.assertIn("50 more warnings (truncated)", result.warnings[-1])
+        self.assertEqual(len(result.warnings), 100)
+        self.assertIn("51 more warnings (truncated)", result.warnings[-1])
 
     def test_warning_suppressed(self):
         """Test that warnings.simplefilter('ignore') suppresses warning capture."""

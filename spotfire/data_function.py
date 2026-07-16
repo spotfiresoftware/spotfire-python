@@ -426,12 +426,17 @@ class AnalyticSpec:
             if caught_warnings:
                 result.has_warnings = True
                 total = len(caught_warnings)
-                result.warnings = [
-                    warnings.formatwarning(w.message, w.category, w.filename, w.lineno, w.line)
-                    for w in caught_warnings[:_MAX_WARNINGS]
-                ]
                 if total > _MAX_WARNINGS:
-                    result.warnings.append(f"... and {total - _MAX_WARNINGS} more warnings (truncated)\n")
+                    result.warnings = [
+                        warnings.formatwarning(w.message, w.category, w.filename, w.lineno, w.line)
+                        for w in caught_warnings[:_MAX_WARNINGS - 1]
+                    ]
+                    result.warnings.append(f"... and {total - _MAX_WARNINGS + 1} more warnings (truncated)\n")
+                else:
+                    result.warnings = [
+                        warnings.formatwarning(w.message, w.category, w.filename, w.lineno, w.line)
+                        for w in caught_warnings
+                    ]
             if not result.success:
                 return
         elif self.analytic_type == "aggregationScript":
