@@ -21,6 +21,54 @@ _ColumnTypes = dict[str, str]
 
 # Table and column metadata functions
 
+def get_table_metadata(dataframe):
+    """Get the table-level Spotfire metadata from a DataFrame.
+
+    :param dataframe: the DataFrame to get the table metadata from
+    :returns: a dict containing the table metadata, or an empty dict if none
+    """
+    try:
+        return dataframe.spotfire_table_metadata
+    except AttributeError:
+        return {}
+
+
+def set_table_metadata(dataframe, metadata):
+    """Set the table-level Spotfire metadata on a DataFrame.
+
+    :param dataframe: the DataFrame to set the table metadata on
+    :param metadata: a dict containing the table metadata
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        dataframe.spotfire_table_metadata = metadata  # type: ignore[attr-defined]
+
+
+def get_column_metadata(dataframe, col):
+    """Get the Spotfire column metadata for a specific column.
+
+    :param dataframe: the DataFrame containing the column
+    :param col: the name of the column
+    :returns: a dict containing the column metadata, or an empty dict if none
+    """
+    try:
+        return dataframe[col].spotfire_column_metadata
+    except AttributeError:
+        return {}
+
+
+def set_column_metadata(dataframe, col, metadata):
+    """Set the Spotfire column metadata for a specific column.
+
+    :param dataframe: the DataFrame containing the column
+    :param col: the name of the column
+    :param metadata: a dict containing the column metadata
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        dataframe[col].spotfire_column_metadata = metadata  # type: ignore[attr-defined]
+
+
 def copy_metadata(source, destination) -> None:
     """Copy the table and column metadata from a Pandas object to another.
 
