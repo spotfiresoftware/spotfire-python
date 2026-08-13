@@ -19,6 +19,10 @@ dependencies = [
     # DataFrame support
     "pandas >= 3.0.0",
     "numpy >= 2.0.0",
+    # Time zone data - pandas 3 only pulls tzdata on Windows; bundle it on all
+    # platforms so zoneinfo resolves named zones in minimal Linux containers
+    # (e.g. debian:13-slim) that do not ship /usr/share/zoneinfo.
+    "tzdata >= 2022.7",
     # Package interactions
     "packaging",
     "pip >= 21.2",
