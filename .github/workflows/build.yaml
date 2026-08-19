@@ -1,5 +1,13 @@
 name: Build and Test Package
 on: [push, pull_request]
+
+# Pull requests from forks build sources that have not been reviewed or merged.  Their runs are still listed
+# under the head branch name, so consumers that pick "the latest run for branch X" can find them; publish
+# their wheels under a distinct artifact name so they can never be mistaken for a wheel built from a commit
+# that actually landed in this repository.
+env:
+  WHEEL_ARTIFACT_PREFIX: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'fork-wheel' || 'wheel' }}
+
 jobs:
   build-sdist:
     name: Build Source Dist
@@ -83,7 +91,7 @@ jobs:
           mv dist\*.whl ..\dist
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
+          name: ${{ env.WHEEL_ARTIFACT_PREFIX }}-${{ matrix.python-version }}-${{ matrix.operating-system }}
           path: 'dist/spotfire-*.whl'
   test:
     name: Test
@@ -98,7 +106,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: wheel-${{ matrix.python-version }}-${{ matrix.operating-system }}
+          name: ${{ env.WHEEL_ARTIFACT_PREFIX }}-${{ matrix.python-version }}-${{ matrix.operating-system }}
           path: dist
       - uses: actions/download-artifact@v4
         with:
@@ -147,7 +155,7 @@ jobs:
           path: dist
       - uses: actions/download-artifact@v4
         with:
-          name: wheel-${{ steps.version.outputs.python-version }}-ubuntu-latest
+          name: ${{ env.WHEEL_ARTIFACT_PREFIX }}-${{ steps.version.outputs.python-version }}-ubuntu-latest
           path: dist
       - name: Install Tools
         run: |
