@@ -16,6 +16,7 @@ import locale
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -667,8 +668,8 @@ class _ZipPackageBuilder(_PackageBuilder):
                 filename_payload_fwdslash = filename_payload.replace("\\", "/")[5:]
                 if os.path.islink(filename_ondisk):
                     payload_script += "if [ ! -e {payload} ]; then ln -s {ondisk} {payload}; fi\n".format(
-                        payload=filename_payload_fwdslash,
-                        ondisk=os.readlink(filename_ondisk))
+                        payload=shlex.quote(filename_payload_fwdslash),
+                        ondisk=shlex.quote(os.readlink(filename_ondisk)))
                 else:
                     payload.write(filename_ondisk, filename_payload.replace("\\", "/"))
                     stat = os.lstat(filename_ondisk)
@@ -679,7 +680,7 @@ class _ZipPackageBuilder(_PackageBuilder):
                                              .strftime("%Y-%m-%dT%H:%M:%SZ")),
                     })
                     if platform.system() != "Windows" and mode != 0o644:
-                        payload_script += f"chmod {mode:o} {filename_payload_fwdslash}\n"
+                        payload_script += f"chmod {mode:o} {shlex.quote(filename_payload_fwdslash)}\n"
 
             # Add the payload script if we added any lines
             if payload_script:
