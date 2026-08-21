@@ -39,4 +39,13 @@ struct _SbdfDecimal {
 extern sbdf_object *_export_extract_string_obj(PyObject *vals, PyObject *invalids, Py_ssize_t start, Py_ssize_t count);
 extern sbdf_object *_export_extract_binary_obj(PyObject *vals, PyObject *invalids, Py_ssize_t start, Py_ssize_t count);
 
+/* Fast string export directly from Arrow LargeUtf8 buffers: no Python str objects created.
+ * values_buf: concatenated UTF-8 bytes from the Arrow values buffer.
+ * offsets:    int64 Arrow offsets (length == nrows+1); offsets[i]..offsets[i+1] is string i.
+ * invalids:   numpy bool array; true means the row is null and should be written as "".
+ */
+extern sbdf_object *_export_extract_string_obj_arrow(const char *values_buf, const int64_t *offsets,
+                                                     const unsigned char *invalids,
+                                                     Py_ssize_t start, Py_ssize_t count);
+
 #endif /* SPOTFIRE_SBDF_HELPERS_H_ */

@@ -24,6 +24,13 @@ __pycache__/
 
 # virtual environments
 /venv/
+/.venv/
+
+# uv lock file (this is a library; lock files are for applications)
+/uv.lock
+
+# Claude Code
+/.claude
 
 # PyCharm project files
 /.idea

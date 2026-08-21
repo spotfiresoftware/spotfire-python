@@ -26,3 +26,9 @@ cdef extern from "sbdf_helpers.h":
         except NULL
     sbdf_c.sbdf_object* _export_extract_binary_obj(object val, object invalids, Py_ssize_t start, Py_ssize_t count) \
         except NULL
+    # Fast Arrow LargeUtf8 path: no Python str objects, no re-encoding
+    sbdf_c.sbdf_object* _export_extract_string_obj_arrow(const char *values_buf,
+                                                         const long long *offsets,
+                                                         const unsigned char *invalids,
+                                                         Py_ssize_t start,
+                                                         Py_ssize_t count) except NULL
