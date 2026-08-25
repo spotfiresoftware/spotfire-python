@@ -93,7 +93,8 @@ def _get(dataframe, key, default=None):
     if val is not None:
         api_hint = {
             _TABLE_METADATA_KEY: "spotfire.get_table_metadata() / spotfire.set_table_metadata()",
-            _COLUMN_METADATA_KEY: "spotfire.get_column_metadata(df, col) / spotfire.set_column_metadata(df, col, metadata)",
+            _COLUMN_METADATA_KEY: "spotfire.get_column_metadata(df, col) / "
+                                  "spotfire.set_column_metadata(df, col, metadata)",
             _SPOTFIRE_TYPES_KEY: "spotfire.get_spotfire_types(df) / spotfire.set_spotfire_types(df, column_types)",
         }.get(key, "the Spotfire metadata APIs")
         warnings.warn(
