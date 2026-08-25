@@ -1015,7 +1015,7 @@ cdef _export_obj_series(obj, default_column_name):
 
     # Column metadata and information
     context = _ExportContext()
-    sf_type = _metadata.get_spotfire_type(obj, column_name)
+    sf_type = _metadata.get_series_spotfire_type(obj, column_name)
     if sf_type is not None:
         context.set_valuetype_id(_export_infer_valuetype_from_spotfire_typename(obj, description, sf_type))
     else:

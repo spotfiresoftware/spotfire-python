@@ -25,6 +25,12 @@ import warnings
 _TABLE_METADATA_KEY = 'spotfire_table_metadata'
 _COLUMN_METADATA_KEY = 'spotfire_column_metadata'
 _SPOTFIRE_TYPES_KEY = 'spotfire_types'
+
+# Scalar key set directly on a standalone Series' attrs (``series.attrs['spotfire_type']``).
+# There is no DataFrame to hang a keyed dict off of in that case, so this remains
+# the supported way to force a Spotfire type when exporting a bare Series.
+_SERIES_TYPE_KEY = 'spotfire_type'
+
 _ALL_KEYS = (_TABLE_METADATA_KEY, _COLUMN_METADATA_KEY, _SPOTFIRE_TYPES_KEY)
 
 # Keys whose values grow with column count and need CoW optimization.
@@ -136,6 +142,19 @@ def set_column_metadata(dataframe, col, metadata):
 def get_spotfire_type(dataframe, col):
     """Return the Spotfire type name for *col*, or ``None`` if not set."""
     return _get(dataframe, _SPOTFIRE_TYPES_KEY, {}).get(col)
+
+
+def get_series_spotfire_type(series, col):
+    """Return the Spotfire type name to use when exporting a standalone ``Series``, or ``None`` if not set.
+
+    Looks in the DataFrame-style ``spotfire_types`` dict first (present when the metadata was
+    copied from a DataFrame), then falls back to the scalar ``series.attrs['spotfire_type']``
+    that callers set directly on a bare Series.
+    """
+    typename = get_spotfire_type(series, col)
+    if typename is None:
+        typename = series.attrs.get(_SERIES_TYPE_KEY)
+    return typename
 
 
 def set_spotfire_type(dataframe, col, typename):

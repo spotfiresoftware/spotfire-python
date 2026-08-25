@@ -407,6 +407,27 @@ class SbdfTest(unittest.TestCase):
         self.assertEqual(exported_types['large'], 'LongInteger')
         self.assertEqual(exported_types['small'], 'Integer')
 
+    def test_series_spotfire_type(self):
+        """Verify a Spotfire type set on a bare ``Series`` is honored when exporting."""
+        # Without an override the type is inferred from the dtype.
+        series = pd.Series([1, 2, 3], name="x")
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "LongInteger")
+
+        # The scalar attrs key set directly on the Series overrides the inferred type.
+        series = pd.Series([1, 2, 3], name="x")
+        series.attrs["spotfire_type"] = "Integer"
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "Integer")
+
+        # An unnamed Series is exported under the default column name.
+        series = pd.Series([1, 2, 3])
+        series.attrs["spotfire_type"] = "Integer"
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "Integer")
+
+        # A type carried in the DataFrame-style dict is honored as well.
+        series = pd.Series([1, 2, 3], name="x")
+        _metadata.set_spotfire_type(series, "x", "Integer")
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "Integer")
+
     def test_non_str_column_name(self):
         """Verify non-string column names export properly."""
         dataframe = pd.DataFrame({
