@@ -49,7 +49,9 @@ class _CowDict(dict):
     This subclass applies Copy-on-Write: ``__deepcopy__`` returns ``self``
     (O(1) — zero cost on read), and the ``_metadata`` setters detach by
     shallow-copying on first write when the dict is shared.  This gives
-    the speed of ``return self`` with the isolation of a full copy.
+    the speed of ``return self`` with the isolation of a full copy for the
+    metadata mapping itself — see ``detach`` for what that deliberately
+    does not cover.
     """
 
     _shared = False
@@ -67,7 +69,17 @@ class _CowDict(dict):
         return self._shared
 
     def detach(self):
-        """Create an independent shallow copy and clear the shared flag."""
+        """Create an independent shallow copy and clear the shared flag.
+
+        The copy is deliberately shallow.  It isolates the mapping, which is all
+        the setters need: ``set_column_metadata`` and ``set_spotfire_type``
+        rebind a whole entry, so a write through one DataFrame cannot be seen by
+        another that shares this dict.  Nested values stay shared, so mutating a
+        dict returned by ``get_column_metadata`` in place is still visible to
+        those copies; go through the setters instead.  Deep-copying here would
+        make each detach O(n) in the column count and reintroduce the O(n^2)
+        column loop this class exists to avoid.
+        """
         clone = _CowDict(self)
         clone._shared = False  # pylint: disable=protected-access
         return clone
