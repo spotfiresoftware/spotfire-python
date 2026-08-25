@@ -1,0 +1,7 @@
+
+Warnings:
+<data_function>:4: UserWarning: bad value at row 0
+<data_function>:4: UserWarning: bad value at row 1
+<data_function>:4: UserWarning: bad value at row 2
+<data_function>:4: UserWarning: bad value at row 3
+<data_function>:4: UserWarning: bad value at row 4

@@ -12,6 +12,7 @@ import traceback
 import types
 import typing
 import re
+import warnings
 
 import pandas as pd
 
@@ -27,6 +28,7 @@ _LogFunction = typing.Callable[[str], None]
 
 
 _COLUMN_METADATA_TRUNCATE_THRESHOLD = 80000
+_MAX_WARNINGS = 100
 
 
 def _bad_string(str_: typing.Any) -> bool:
@@ -218,7 +220,9 @@ class AnalyticOutput:
 
 class AnalyticResult:
     """Represents the results of evaluating an AnalyticSpec object."""
+    # pylint: disable=too-many-instance-attributes
     std_err_out: typing.Optional[str]
+    warnings: list[str]
     summary: typing.Optional[str]
     _exc_info: _ExceptionInfo
     _debug_log: typing.Optional[str]
@@ -226,7 +230,9 @@ class AnalyticResult:
     def __init__(self, capture: _OutputCapture) -> None:
         self.success = True
         self.has_stderr = False
+        self.has_warnings = False
         self.std_err_out = None
+        self.warnings = []
         self.summary = None
         self._exc_info = (None, None, None)
         self._capture = capture
@@ -411,9 +417,25 @@ class AnalyticSpec:
         if self.analytic_type == "script":
             # noinspection PyBroadException
             try:
-                exec(compiled_script, self.globals)
+                with warnings.catch_warnings(record=True) as caught_warnings:
+                    exec(compiled_script, self.globals)
             except BaseException:
                 result.fail_with_exception(sys.exc_info())
+            if caught_warnings:
+                result.has_warnings = True
+                total = len(caught_warnings)
+                if total > _MAX_WARNINGS:
+                    result.warnings = [
+                        warnings.formatwarning(w.message, w.category, w.filename, w.lineno, w.line)
+                        for w in caught_warnings[:_MAX_WARNINGS - 1]
+                    ]
+                    result.warnings.append(f"... and {total - _MAX_WARNINGS + 1} more warnings (truncated)\n")
+                else:
+                    result.warnings = [
+                        warnings.formatwarning(w.message, w.category, w.filename, w.lineno, w.line)
+                        for w in caught_warnings
+                    ]
+            if not result.success:
                 return
         elif self.analytic_type == "aggregationScript":
             self.debug("aggregation scripts are not supported")
@@ -487,6 +509,9 @@ class AnalyticSpec:
                     result.has_stderr = True
                     buf.write("\nStandard error:\n")
                     buf.write(result.std_err_out)
+            if result.has_warnings:
+                buf.write("\nWarnings:\n")
+                buf.writelines(result.warnings)
             if self.debug_enabled:
                 debug_log = result.get_debug_log()
                 if debug_log:

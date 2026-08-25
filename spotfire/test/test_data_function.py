@@ -43,7 +43,8 @@ class DataFunctionTest(unittest.TestCase):
     """Unit tests for public functions in 'spotfire.data_function' module."""
     # pylint: disable=too-many-branches, too-many-statements, too-many-arguments, too-many-public-methods
 
-    def _run_analytic(self, script, inputs, outputs, success, expected_result, spec_adjust=None) -> None:
+    def _run_analytic(self, script, inputs, outputs, success, expected_result, spec_adjust=None,
+                       has_warnings=None, has_stderr=None) -> None:
         """Run a full pass through the analytic protocol, and compare the output to the expected value."""
         # pylint: disable=too-many-positional-arguments,protected-access,too-many-locals
         with _utils.TempFiles() as temp_files:
@@ -105,6 +106,10 @@ class DataFunctionTest(unittest.TestCase):
             if not actual_result.success:
                 print("test: data function has failed")
             self.assertEqual(actual_result.success, success)
+            if has_warnings is not None:
+                self.assertEqual(actual_result.has_warnings, has_warnings)
+            if has_stderr is not None:
+                self.assertEqual(actual_result.has_stderr, has_stderr)
             print("test: done evaluating spec")
 
             for output in output_spec:
@@ -232,7 +237,7 @@ x = a*b
 print("But not this.")""", {}, {}, False, expected)
 
     def test_warning_pysrv79(self):
-        """Test that warnings are returned."""
+        """Test that warnings are returned separately from stderr."""
         expected = _PythonVersionedExpectedValue("warning_pysrv79")
         self._run_analytic("""import warnings
 warnings.simplefilter("always")
@@ -247,7 +252,40 @@ warn("This is a PendingDeprecationWarning", PendingDeprecationWarning)
 warn("This is a ImportWarning", ImportWarning)
 warn("This is a UnicodeWarning", UnicodeWarning)
 warn("This is a BytesWarning", BytesWarning)
-warn("This is a ResourceWarning", ResourceWarning)""", {}, {}, True, expected)
+warn("This is a ResourceWarning", ResourceWarning)""", {}, {}, True, expected,
+                           has_warnings=True, has_stderr=False)
+
+
+    def test_warning_per_row(self):
+        """Test that unique per-row warnings are each captured individually."""
+        in1_df = pd.DataFrame({"a": pd.array([1, 2, 3, 4, 5], dtype="Int64")})
+        expected = _PythonVersionedExpectedValue("warning_per_row")
+        self._run_analytic("""import warnings
+warnings.simplefilter("always")
+for idx, row in in1.iterrows():
+    warnings.warn(f"bad value at row {idx}")
+output = in1""", {"in1": in1_df}, {"output": in1_df}, True, expected,
+                           has_warnings=True, has_stderr=False)
+
+    def test_warning_truncated(self):
+        """Test that warnings are truncated to _MAX_WARNINGS."""
+        spec = datafn.AnalyticSpec("script", [], [], """import warnings
+warnings.simplefilter("always")
+for i in range(150):
+    warnings.warn(f"warning {i}")""")
+        result = spec.evaluate()
+        self.assertTrue(result.has_warnings)
+        self.assertEqual(len(result.warnings), 100)
+        self.assertIn("51 more warnings (truncated)", result.warnings[-1])
+
+    def test_warning_suppressed(self):
+        """Test that warnings.simplefilter('ignore') suppresses warning capture."""
+        self._run_analytic("""import warnings
+warnings.simplefilter("ignore")
+import pandas as pd
+df = pd.DataFrame({"x": [1, 2, 3]})
+df.new_col = [4, 5, 6]""", {}, {}, True, None,
+                           has_warnings=False, has_stderr=False)
 
     def test_stderr_pysrv116(self):
         """Test that stdout is returned correctly with stderr"""
