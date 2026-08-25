@@ -921,8 +921,13 @@ cdef _export_obj_dataframe(obj):
     table_metadata = _metadata.get_table_metadata(obj)
     export_column_names = obj.columns.tolist()
     all_dtypes = obj.dtypes
-    all_sf_types = {c: _metadata.get_spotfire_type(obj, c) for c in export_column_names}
-    all_col_meta = {c: _metadata.get_column_metadata(obj, c) for c in export_column_names}
+    # Note: built with explicit loops instead of dict comprehensions, since cython-lint
+    # crashes when traversing dict comprehensions (DictComprehensionAppendNode).
+    all_sf_types = {}
+    all_col_meta = {}
+    for name in export_column_names:
+        all_sf_types[name] = _metadata.get_spotfire_type(obj, name)
+        all_col_meta[name] = _metadata.get_column_metadata(obj, name)
 
     column_names = []
     column_metadata = []
