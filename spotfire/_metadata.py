@@ -85,10 +85,13 @@ def _get(dataframe, key, default=None):
     # Fallback: legacy monkey-patched attribute in __dict__
     val = dataframe.__dict__.get(key)
     if val is not None:
+        api_hint = {
+            _TABLE_METADATA_KEY: "spotfire.get_table_metadata() / spotfire.set_table_metadata()",
+            _COLUMN_METADATA_KEY: "spotfire.get_column_metadata(df, col) / spotfire.set_column_metadata(df, col, metadata)",
+            _SPOTFIRE_TYPES_KEY: "spotfire.get_spotfire_types(df) / spotfire.set_spotfire_types(df, column_types)",
+        }.get(key, "the Spotfire metadata APIs")
         warnings.warn(
-            f"Accessing metadata via df.{key} is deprecated. "
-            f"Use the spotfire.get_table_metadata() / spotfire.set_table_metadata() "
-            f"functions instead.",
+            f"Accessing metadata via df.{key} is deprecated. Use {api_hint} instead.",
             DeprecationWarning,
             stacklevel=3
         )
