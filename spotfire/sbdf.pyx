@@ -950,11 +950,7 @@ cdef _export_obj_dataframe(obj):
                 context.set_valuetype_id(_export_infer_valuetype_from_pandas_dtype(series, f"column '{col}'"))
             na_value = context.get_numpy_na_value()
             invalids = pd.isnull(series)
-            numpy_dtype = context.get_numpy_dtype()
-            if numpy_dtype is not None:
-                values = series.fillna(na_value).to_numpy(dtype=numpy_dtype, copy=False)
-            else:
-                values = series.fillna(na_value).to_numpy(copy=False)
+            values = series.fillna(na_value).to_numpy(dtype=context.get_numpy_dtype(), copy=False)
             context.set_arrays(values, invalids)
             exporter_contexts.append(context)
             column_metadata.append(all_col_meta[col])
