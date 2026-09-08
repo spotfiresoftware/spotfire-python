@@ -783,7 +783,7 @@ def import_data(sbdf_file):
                                       name=column_names[i])
             column_series.loc[importer_contexts[i].get_invalid_array()] = None
             imported_columns.append(column_series)
-        dataframe = pd.concat(imported_columns, axis=1, sort=False)
+        dataframe = pd.concat(imported_columns, axis=1)
         for i in range(num_columns):
             _metadata.set_column_metadata(dataframe, column_names[i], column_metadata[i])
             _metadata.set_spotfire_type(dataframe, column_names[i], importer_contexts[i].get_spotfire_type_name())
