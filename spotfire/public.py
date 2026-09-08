@@ -8,7 +8,7 @@ import warnings
 
 import pandas as pd
 
-from spotfire import sbdf
+from spotfire import sbdf, _metadata
 
 try:
     import geopandas as gpd
@@ -20,6 +20,43 @@ _ColumnTypes = dict[str, str]
 
 
 # Table and column metadata functions
+
+def get_table_metadata(dataframe):
+    """Get the table-level Spotfire metadata from a DataFrame.
+
+    :param dataframe: the DataFrame to get the table metadata from
+    :returns: a dict containing the table metadata, or an empty dict if none
+    """
+    return _metadata.get_table_metadata(dataframe)
+
+
+def set_table_metadata(dataframe, metadata):
+    """Set the table-level Spotfire metadata on a DataFrame.
+
+    :param dataframe: the DataFrame to set the table metadata on
+    :param metadata: a dict containing the table metadata
+    """
+    _metadata.set_table_metadata(dataframe, metadata)
+
+
+def get_column_metadata(dataframe, col):
+    """Get the Spotfire column metadata for a specific column.
+
+    :param dataframe: the DataFrame containing the column
+    :param col: the name of the column
+    :returns: a dict containing the column metadata, or an empty dict if none
+    """
+    return _metadata.get_column_metadata(dataframe, col)
+
+
+def set_column_metadata(dataframe, col, metadata):
+    """Set the Spotfire column metadata for a specific column.
+
+    :param dataframe: the DataFrame containing the column
+    :param col: the name of the column
+    :param metadata: a dict containing the column metadata
+    """
+    _metadata.set_column_metadata(dataframe, col, metadata)
 
 def copy_metadata(source, destination) -> None:
     """Copy the table and column metadata from a Pandas object to another.
@@ -34,27 +71,8 @@ def copy_metadata(source, destination) -> None:
     if isinstance(source, pd.Series) and not isinstance(destination, pd.Series):
         raise TypeError("both source and destination must be Series")
 
-    # Handle DataFrames
-    if isinstance(source, pd.DataFrame):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            try:
-                destination.spotfire_table_metadata = source.spotfire_table_metadata
-            except AttributeError:
-                pass
-        for col in source.columns:
-            try:
-                source1 = source[col]
-                destination1 = destination[col]
-                destination1.spotfire_column_metadata = source1.spotfire_column_metadata
-            except AttributeError:
-                pass
-    # Handle Series
-    elif isinstance(source, pd.Series):
-        try:
-            destination.spotfire_column_metadata = source.spotfire_column_metadata
-        except AttributeError:
-            pass
+    if isinstance(source, (pd.DataFrame, pd.Series)):
+        _metadata.copy_all_metadata(source, destination)
 
 
 # Spotfire type functions
@@ -67,12 +85,8 @@ def get_spotfire_types(dataframe: pd.DataFrame) -> pd.Series:
     """
     if not isinstance(dataframe, pd.DataFrame):
         raise TypeError("dataframe is not a DataFrame")
-    spotfire_types = {}
-    for col in dataframe.columns:
-        if 'spotfire_type' in dataframe[col].attrs:
-            spotfire_types[col] = dataframe[col].attrs['spotfire_type']
-        else:
-            spotfire_types[col] = None
+    all_types = _metadata.get_all_spotfire_types(dataframe)
+    spotfire_types = {col: all_types.get(col) for col in dataframe.columns}
     return pd.Series(spotfire_types)
 
 
@@ -92,7 +106,7 @@ def set_spotfire_types(dataframe: pd.DataFrame, column_types: _ColumnTypes) -> N
         if not sbdf.spotfire_typename_to_valuetype_id(spotfire_type):
             warnings.warn(f"Spotfire type '{spotfire_type}' for column '{col}' not recognized", sbdf.SBDFWarning)
             continue
-        dataframe[col].attrs['spotfire_type'] = spotfire_type
+        _metadata.set_spotfire_type(dataframe, col, spotfire_type)
 
 
 # Spotfire geocoding table functions
@@ -117,16 +131,18 @@ def set_geocoding_table(dataframe: "gpd.GeoDataFrame") -> None:
         # Create columns from geometry
         bounds = dataframe.geometry.bounds
         centroid = dataframe.geometry.centroid
-        dataframe.assign(XMin=bounds["minx"], XMax=bounds["maxx"],
-                         YMin=bounds["miny"], YMax=bounds["maxy"],
-                         XCenter=centroid.x, YCenter=centroid.y)
+        dataframe["XMin"] = bounds["minx"]
+        dataframe["XMax"] = bounds["maxx"]
+        dataframe["YMin"] = bounds["miny"]
+        dataframe["YMax"] = bounds["maxy"]
+        dataframe["XCenter"] = centroid.x
+        dataframe["YCenter"] = centroid.y
         for col in columns:
-            dataframe[col].spotfire_column_metadata = {"MapChart.ColumnTypeId": [col]}
+            _metadata.set_column_metadata(dataframe, col, {"MapChart.ColumnTypeId": [col]})
 
         # Set table metadata
-        try:
-            table_metadata = dataframe.spotfire_table_metadata
-        except AttributeError:
+        table_metadata = _metadata.get_table_metadata(dataframe)
+        if not table_metadata:
             table_metadata = {}
 
         table_metadata["MapChart.IsGeocodingTable"] = True
@@ -147,6 +163,4 @@ def set_geocoding_table(dataframe: "gpd.GeoDataFrame") -> None:
         else:
             raise sbdf.SBDFError(f"geocoding tables cannot contain unknown geometry types ('{geom_type}')")
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            dataframe.spotfire_table_metadata = table_metadata
+        _metadata.set_table_metadata(dataframe, table_metadata)

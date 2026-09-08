@@ -18,7 +18,7 @@ import PIL.Image
 from packaging import version
 
 import spotfire
-from spotfire import sbdf
+from spotfire import sbdf, _metadata
 from spotfire.test import utils
 
 
@@ -49,20 +49,20 @@ class SbdfTest(unittest.TestCase):
             self.assertEqual(dict_[f"{pre}MetaBinary{post}"][0], b"\x01")
 
         # Check table metadata
-        verify(dataframe.spotfire_table_metadata, "SbdfTest.Table", "")
+        verify(_metadata.get_table_metadata(dataframe), "SbdfTest.Table", "")
         # Check column metadata
-        verify(dataframe["Boolean"].spotfire_column_metadata, "SbdfTest.Column", "0")
-        verify(dataframe["Integer"].spotfire_column_metadata, "SbdfTest.Column", "1")
-        verify(dataframe["Long"].spotfire_column_metadata, "SbdfTest.Column", "2")
-        verify(dataframe["Float"].spotfire_column_metadata, "SbdfTest.Column", "3")
-        verify(dataframe["Double"].spotfire_column_metadata, "SbdfTest.Column", "4")
-        verify(dataframe["DateTime"].spotfire_column_metadata, "SbdfTest.Column", "5")
-        verify(dataframe["Date"].spotfire_column_metadata, "SbdfTest.Column", "6")
-        verify(dataframe["Time"].spotfire_column_metadata, "SbdfTest.Column", "7")
-        verify(dataframe["TimeSpan"].spotfire_column_metadata, "SbdfTest.Column", "8")
-        verify(dataframe["String"].spotfire_column_metadata, "SbdfTest.Column", "9")
-        verify(dataframe["Decimal"].spotfire_column_metadata, "SbdfTest.Column", "10")
-        verify(dataframe["Binary"].spotfire_column_metadata, "SbdfTest.Column", "11")
+        verify(_metadata.get_column_metadata(dataframe, "Boolean"), "SbdfTest.Column", "0")
+        verify(_metadata.get_column_metadata(dataframe, "Integer"), "SbdfTest.Column", "1")
+        verify(_metadata.get_column_metadata(dataframe, "Long"), "SbdfTest.Column", "2")
+        verify(_metadata.get_column_metadata(dataframe, "Float"), "SbdfTest.Column", "3")
+        verify(_metadata.get_column_metadata(dataframe, "Double"), "SbdfTest.Column", "4")
+        verify(_metadata.get_column_metadata(dataframe, "DateTime"), "SbdfTest.Column", "5")
+        verify(_metadata.get_column_metadata(dataframe, "Date"), "SbdfTest.Column", "6")
+        verify(_metadata.get_column_metadata(dataframe, "Time"), "SbdfTest.Column", "7")
+        verify(_metadata.get_column_metadata(dataframe, "TimeSpan"), "SbdfTest.Column", "8")
+        verify(_metadata.get_column_metadata(dataframe, "String"), "SbdfTest.Column", "9")
+        verify(_metadata.get_column_metadata(dataframe, "Decimal"), "SbdfTest.Column", "10")
+        verify(_metadata.get_column_metadata(dataframe, "Binary"), "SbdfTest.Column", "11")
 
     def test_read_1(self):
         """Reading simple SBDF files should work."""
@@ -99,8 +99,9 @@ class SbdfTest(unittest.TestCase):
         for i, j in zip(dataframe.get("Double")[0:9].dropna().tolist(),
                         [116.18, 122.46, 125.6, 128.74, 131.88, 135.02]):
             self.assertAlmostEqual(i, j)
-        self.assertEqual(dataframe.get("String")[0:5].tolist(),
-                         ["The", "quick", None, None, "jumps"])
+        string_col = dataframe.get("String")[0:5]
+        self.assertEqual(string_col.dropna().tolist(), ["The", "quick", "jumps"])
+        self.assertEqual(string_col.isna().tolist(), [False, False, True, True, False])
         self.assertEqual(dataframe.get("Decimal")[0:4].tolist(),
                          [decimal.Decimal("1438.1565"), None, None, decimal.Decimal("1538.493")])
 
@@ -262,7 +263,7 @@ class SbdfTest(unittest.TestCase):
             spotfire.set_spotfire_types(dataframe, {"x": "Unknown"})
 
         # force set it and see expect it to be ignored
-        dataframe["x"].attrs["spotfire_type"] = "Unknown"
+        _metadata.set_spotfire_type(dataframe, "x", "Unknown")
         new_df = self._roundtrip_dataframe(dataframe)
         new_df_types = spotfire.get_spotfire_types(new_df)
         self.assertEqual(new_df_types["x"], "LongInteger")
@@ -406,6 +407,27 @@ class SbdfTest(unittest.TestCase):
         self.assertEqual(exported_types['large'], 'LongInteger')
         self.assertEqual(exported_types['small'], 'Integer')
 
+    def test_series_spotfire_type(self):
+        """Verify a Spotfire type set on a bare ``Series`` is honored when exporting."""
+        # Without an override the type is inferred from the dtype.
+        series = pd.Series([1, 2, 3], name="x")
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "LongInteger")
+
+        # The scalar attrs key set directly on the Series overrides the inferred type.
+        series = pd.Series([1, 2, 3], name="x")
+        series.attrs["spotfire_type"] = "Integer"
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "Integer")
+
+        # An unnamed Series is exported under the default column name.
+        series = pd.Series([1, 2, 3])
+        series.attrs["spotfire_type"] = "Integer"
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "Integer")
+
+        # A type carried in the DataFrame-style dict is honored as well.
+        series = pd.Series([1, 2, 3], name="x")
+        _metadata.set_spotfire_type(series, "x", "Integer")
+        self.assertEqual(spotfire.get_spotfire_types(self._roundtrip_dataframe(series))["x"], "Integer")
+
     def test_non_str_column_name(self):
         """Verify non-string column names export properly."""
         dataframe = pd.DataFrame({
@@ -522,7 +544,7 @@ class SbdfTest(unittest.TestCase):
             pd.testing.assert_frame_equal(imported[["col", "txt"]], dataframe, check_dtype=False)
             # Check dtype of the column
             self.assertEqual(dataframe["col"].dtype, "int64")
-            self.assertEqual(dataframe["txt"].dtype, "object")
+            self.assertTrue(pd.api.types.is_string_dtype(dataframe["txt"]))
 
     @staticmethod
     def _roundtrip_dataframe(dataframe: typing.Any) -> pd.DataFrame:
