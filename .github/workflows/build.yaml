@@ -74,6 +74,9 @@ jobs:
       - name: Convert Wheel to Manylinux
         if: ${{ matrix.operating-system == 'ubuntu-22.04' }}
         run: |
+          # ubuntu-22.04 ships patchelf 0.14.3, below the >= 0.14.5 that auditwheel repair requires.
+          # The PyPI wheel bundles a current binary and installs ahead of /usr/bin on PATH.
+          pip install 'patchelf>=0.14.5'
           mv dist/*.whl .
           auditwheel repair -w dist --plat manylinux2014_x86_64 ./*.whl
       - uses: actions/upload-artifact@v4
