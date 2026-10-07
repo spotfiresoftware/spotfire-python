@@ -9,7 +9,7 @@ cdef extern from "<wincrypt.h>" nogil:
 
     # Structure defined at https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_info
     ctypedef struct CERT_INFO:
-        pass
+        windows.FILETIME NotAfter
 
     # Structure defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_context
     ctypedef struct CERT_CONTEXT:
@@ -18,6 +18,7 @@ cdef extern from "<wincrypt.h>" nogil:
     # Preprocessor definitions for CertGetCertificateContextProperty function
     cdef enum:
         CERT_KEY_SPEC_PROP_ID
+        CERT_SHA1_HASH_PROP_ID
 
     # Type defined at https://docs.microsoft.com/en-us/windows/win32/seccrypto/alg-id
     ctypedef unsigned int ALG_ID
@@ -71,5 +72,9 @@ cdef extern from "<wincrypt.h>" nogil:
     windows.BOOL CertFreeCertificateContext(CERT_CONTEXT*)
 
     # Function defined at
+    # https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certduplicatecertificatecontext
+    const CERT_CONTEXT* CertDuplicateCertificateContext(const CERT_CONTEXT*)
+
+    # Function defined at
     # https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certverifytimevalidity
-    long CertVerifyTimeValidity(void*, CERT_INFO*)
+    windows.LONG CertVerifyTimeValidity(windows.FILETIME*, CERT_INFO*)

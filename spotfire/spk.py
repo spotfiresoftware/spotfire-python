@@ -734,8 +734,9 @@ class _CabPackageBuilder(_PackageBuilder):
              argument("--store-name", metavar="STORE", help="name of the certificate store to find the certificate "
                                                             "to sign the package in (Analyst only)"),
              argument("--store-cn", metavar="STRING", help="substring of the subject common name of the certificate "
-                                                           "in the certificate store to sign the package with (Analyst "
-                                                           "only)"),
+                                                           "in the certificate store to sign the package with; if "
+                                                           "several match, the valid one that expires last is used "
+                                                           "(Analyst only)"),
              argument("--timestamp", metavar="URL", help="URL of a timestamping service to timestamp the package with "
                                                          "(Analyst only)"),
              argument("--sha256", action="store_true", help="use SHA-256 for file and timestamp digests (Analyst only)")
@@ -829,8 +830,9 @@ def python(args, hook=None) -> None:
              argument("--store-name", metavar="STORE", help="name of the certificate store to find the certificate "
                                                             "to sign the package in (Analyst only)"),
              argument("--store-cn", metavar="STRING", help="substring of the subject common name of the certificate "
-                                                           "in the certificate store to sign the package with (Analyst "
-                                                           "only)"),
+                                                           "in the certificate store to sign the package with; if "
+                                                           "several match, the valid one that expires last is used "
+                                                           "(Analyst only)"),
              argument("--timestamp", metavar="URL", help="URL of a timestamping service to timestamp the package with "
                                                          "(Analyst only)"),
              argument("--sha256", action="store_true", help="use SHA-256 for file and timestamp digests (Analyst only)")
