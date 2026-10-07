@@ -42,7 +42,8 @@ cpdef void codesign_file(filename,
     or PKCS#12 container.
 
     :param filename: the filename of the file to codesign
-    :param certificate: the filename of the certificate file to codesign with
+    :param certificate: the filename of the certificate file to codesign with.  If the file contains several
+      certificates, the currently valid one with a private key that expires last is used.
     :param password: the password used to unlock the certificate
     :param timestamp: a URL of the timestamping service to timestamp the code signature with
     :param use_rfc3161: whether or not to use the RFC 3161 timestamping protocol.  If ``True``, use RFC 3161.
@@ -103,7 +104,8 @@ cpdef void codesign_file_from_store(filename,
     :param store_location: the location of the Windows certificate store to find the certificate to sign with in
     :param store_name: the name of the Windows certificate store to find the certificate to sign with in
     :param store_cn: a string specifying the subject common name (or a substring thereof) of the certificate to
-      sign with
+      sign with.  If several certificates match, the currently valid one with a private key that expires last
+      is used.
     :param timestamp: a URL of the timestamping service to timestamp the code signature with
     :param use_rfc3161: whether or not to use the RFC 3161 timestamping protocol.  If ``True``, use RFC 3161.
       If ``False``, use Authenticode.
@@ -165,7 +167,8 @@ cdef windows.LPCWSTR _object_to_wstr(object obj):
 
     obj_bytes = str(obj).encode("utf-8")
     len_ = windows.MultiByteToWideChar(windows.CP_UTF8, 0, obj_bytes, <int>len(obj_bytes), NULL, 0)
-    wstr = <windows.LPCWSTR>stdlib.calloc(len_, sizeof(windows.WCHAR))
+    # Allocate one extra (zeroed) character for the null terminator, which MultiByteToWideChar does not write
+    wstr = <windows.LPCWSTR>stdlib.calloc(len_ + 1, sizeof(windows.WCHAR))
     windows.MultiByteToWideChar(windows.CP_UTF8, 0, obj_bytes, <int>len(obj_bytes), <windows.LPWSTR>wstr, len_)
 
     return wstr
@@ -183,7 +186,10 @@ cdef void _codesign_file_core(filename,
     cdef mssign32.SignerTimeStampEx2Type signer_time_stamp_ex2_fun
     cdef mssign32.SignerFreeSignerContextType signer_free_signer_context_fun
     cdef const wincrypt.CERT_CONTEXT* cert_context = NULL
+    cdef const wincrypt.CERT_CONTEXT* candidate = NULL
     cdef windows.DWORD key_spec, key_spec_len
+    cdef unsigned char thumbprint[20]
+    cdef windows.DWORD thumbprint_len
     cdef mssign32.SIGNER_FILE_INFO signer_file_info
     cdef mssign32.SIGNER_SUBJECT_INFO signer_subject_info
     cdef windows.DWORD index
@@ -220,29 +226,33 @@ cdef void _codesign_file_core(filename,
         if signer_free_signer_context_fun is NULL:
             raise CodesignError("Cannot find function 'SignerFreeSignerContext'")
 
-        # Extract the cert from the store
-        cert_context = wincrypt.CertFindCertificateInStore(cert_store,
-                                                           wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
-                                                           0, cert_find_type, cert_find_param, NULL)
-        if cert_context is NULL:
-            raise CodesignError("Could not get certificate from store")
-        found_usable_cert = False
-        while not found_usable_cert:
+        # Extract the cert from the store.  Of all the matching certs that have a private key and are currently
+        # valid, use the one that expires last.
+        candidate = wincrypt.CertFindCertificateInStore(cert_store,
+                                                        wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
+                                                        0, cert_find_type, cert_find_param, NULL)
+        while candidate is not NULL:
             key_spec_len = sizeof(key_spec)
-            has_private_key = wincrypt.CertGetCertificateContextProperty(cert_context,
+            has_private_key = wincrypt.CertGetCertificateContextProperty(candidate,
                                                                          wincrypt.CERT_KEY_SPEC_PROP_ID,
                                                                          &key_spec, &key_spec_len)
-            # Skip certificates that are expired or not yet valid
-            is_time_valid = wincrypt.CertVerifyTimeValidity(NULL, cert_context.pCertInfo) == 0
+            is_time_valid = wincrypt.CertVerifyTimeValidity(NULL, candidate.pCertInfo) == 0
             if has_private_key and is_time_valid:
-                found_usable_cert = True
-            else:
-                cert_context = wincrypt.CertFindCertificateInStore(cert_store,
-                                                                   wincrypt.X509_ASN_ENCODING |
-                                                                   wincrypt.PKCS_7_ASN_ENCODING,
-                                                                   0, cert_find_type, cert_find_param, cert_context)
-                if cert_context is NULL:
-                    raise CodesignError("Could not find a valid, unexpired certificate with a private key in store")
+                if cert_context is NULL or windows.CompareFileTime(&candidate.pCertInfo.NotAfter,
+                                                                   &cert_context.pCertInfo.NotAfter) > 0:
+                    if cert_context is not NULL:
+                        wincrypt.CertFreeCertificateContext(cert_context)
+                    cert_context = wincrypt.CertDuplicateCertificateContext(candidate)
+            # Passing the previous context frees it
+            candidate = wincrypt.CertFindCertificateInStore(cert_store,
+                                                            wincrypt.X509_ASN_ENCODING | wincrypt.PKCS_7_ASN_ENCODING,
+                                                            0, cert_find_type, cert_find_param, candidate)
+        if cert_context is NULL:
+            raise CodesignError("Could not find a currently valid certificate with a private key in store")
+        thumbprint_len = sizeof(thumbprint)
+        if wincrypt.CertGetCertificateContextProperty(cert_context, wincrypt.CERT_SHA1_HASH_PROP_ID,
+                                                      thumbprint, &thumbprint_len):
+            print(f"Signing {filename} with certificate {(<char*>thumbprint)[:thumbprint_len].hex().upper()}")
 
         # Prepare structures
         signer_file_info.cbSize = sizeof(mssign32.SIGNER_FILE_INFO)
