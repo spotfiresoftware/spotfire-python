@@ -7,9 +7,13 @@ cdef extern from "<wincrypt.h>" nogil:
         X509_ASN_ENCODING
         PKCS_7_ASN_ENCODING
 
+    # Structure defined at https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_info
+    ctypedef struct CERT_INFO:
+        pass
+
     # Structure defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/ns-wincrypt-cert_context
     ctypedef struct CERT_CONTEXT:
-        pass
+        CERT_INFO* pCertInfo
 
     # Preprocessor definitions for CertGetCertificateContextProperty function
     cdef enum:
@@ -65,3 +69,7 @@ cdef extern from "<wincrypt.h>" nogil:
 
     # Function defined at https://docs.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certfreecertificatecontext
     windows.BOOL CertFreeCertificateContext(CERT_CONTEXT*)
+
+    # Function defined at
+    # https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-certverifytimevalidity
+    long CertVerifyTimeValidity(void*, CERT_INFO*)
