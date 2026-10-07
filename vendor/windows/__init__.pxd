@@ -11,6 +11,15 @@ cdef extern from "<windows.h>" nogil:
     ctypedef Py_ssize_t INT_PTR
     ctypedef unsigned int UINT
     ctypedef Py_ssize_t ULONG_PTR
+    ctypedef long LONG
+
+    # Structure defined at https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
+    ctypedef struct FILETIME:
+        DWORD dwLowDateTime
+        DWORD dwHighDateTime
+
+    # Function defined at https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-comparefiletime
+    cdef LONG CompareFileTime(const FILETIME*, const FILETIME*)
 
     # Preprocessor definitions defined at https://docs.microsoft.com/en-us/windows/win32/seccrypto/common-hresult-values
     cdef enum:
