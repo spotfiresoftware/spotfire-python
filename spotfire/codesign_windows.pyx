@@ -226,21 +226,23 @@ cdef void _codesign_file_core(filename,
                                                            0, cert_find_type, cert_find_param, NULL)
         if cert_context is NULL:
             raise CodesignError("Could not get certificate from store")
-        found_private_key = False
-        while not found_private_key:
+        found_usable_cert = False
+        while not found_usable_cert:
             key_spec_len = sizeof(key_spec)
             has_private_key = wincrypt.CertGetCertificateContextProperty(cert_context,
                                                                          wincrypt.CERT_KEY_SPEC_PROP_ID,
                                                                          &key_spec, &key_spec_len)
-            if has_private_key:
-                found_private_key = True
+            # Skip certificates that are expired or not yet valid
+            is_time_valid = wincrypt.CertVerifyTimeValidity(NULL, cert_context.pCertInfo) == 0
+            if has_private_key and is_time_valid:
+                found_usable_cert = True
             else:
                 cert_context = wincrypt.CertFindCertificateInStore(cert_store,
                                                                    wincrypt.X509_ASN_ENCODING |
                                                                    wincrypt.PKCS_7_ASN_ENCODING,
                                                                    0, cert_find_type, cert_find_param, cert_context)
                 if cert_context is NULL:
-                    raise CodesignError("Could not get certificate from store")
+                    raise CodesignError("Could not find a valid, unexpired certificate with a private key in store")
 
         # Prepare structures
         signer_file_info.cbSize = sizeof(mssign32.SIGNER_FILE_INFO)
