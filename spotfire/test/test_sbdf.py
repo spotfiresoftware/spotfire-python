@@ -180,11 +180,12 @@ class SbdfTest(unittest.TestCase):
             'd': pd.Series([10., pd.NA, 12.], dtype='Float64')
         })
         df2 = self._roundtrip_dataframe(dataframe)
-        self.assertTrue(pd.isna(df2.at[2, 'b']))
-        self.assertTrue(pd.isna(df2.at[1, 'i']))
-        self.assertTrue(pd.isna(df2.at[0, 'l']))
-        self.assertTrue(pd.isna(df2.at[2, 'f']))
-        self.assertTrue(pd.isna(df2.at[1, 'd']))
+        df2_na = df2.isna()
+        self.assertTrue(df2_na.at[2, 'b'])
+        self.assertTrue(df2_na.at[1, 'i'])
+        self.assertTrue(df2_na.at[0, 'l'])
+        self.assertTrue(df2_na.at[2, 'f'])
+        self.assertTrue(df2_na.at[1, 'd'])
 
     def test_get_spotfire_types(self):
         """All types should be reported properly."""
