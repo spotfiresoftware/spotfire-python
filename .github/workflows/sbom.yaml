@@ -31,7 +31,7 @@ jobs:
       github.event_name == 'release' ||
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       python-versions: ${{ steps.dynamic.outputs.pythons }}
     steps:
@@ -46,7 +46,7 @@ jobs:
   sbom-sdist:
     name: SBOM – Source Distribution
     needs: setup
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -127,7 +127,7 @@ jobs:
   sbom-wheel:
     name: SBOM – Wheel (${{ matrix.python-version }})
     needs: setup
-    runs-on: ubuntu-latest       # Linux only — Windows wheels cannot be cross-compiled
+    runs-on: ubuntu-24.04       # Linux only — Windows wheels cannot be cross-compiled
     strategy:
       matrix:
         python-version: ${{ fromJson(needs.setup.outputs.python-versions) }}
@@ -142,7 +142,7 @@ jobs:
         if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
-          name: wheel-${{ matrix.python-version }}-ubuntu-latest
+          name: wheel-${{ matrix.python-version }}-ubuntu-24.04
           path: dist
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -231,7 +231,7 @@ jobs:
     name: Attach SBOMs to Release
     if: github.event_name == 'release'
     needs: [sbom-sdist, sbom-wheel]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Download all SBOM artifacts
         uses: actions/download-artifact@v4

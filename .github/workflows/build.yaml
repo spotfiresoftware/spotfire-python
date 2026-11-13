@@ -11,7 +11,7 @@ env:
 jobs:
   build-sdist:
     name: Build Source Dist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,7 +55,7 @@ jobs:
     strategy:
       matrix:
         python-version: ${{ fromJson(needs.build-sdist.outputs.python-versions) }}
-        operating-system: ['ubuntu-latest', 'windows-latest']
+        operating-system: ['ubuntu-24.04', 'windows-latest']
       fail-fast: false
     steps:
       - uses: actions/download-artifact@v4
@@ -70,7 +70,7 @@ jobs:
         run: |
           pip install auditwheel build setuptools
       - name: Build Wheel (Linux)
-        if: matrix.operating-system == 'ubuntu-latest'
+        if: matrix.operating-system == 'ubuntu-24.04'
         run: |
           # Unpack sdist
           tar xzf dist/spotfire-*.tar.gz
@@ -100,7 +100,7 @@ jobs:
     strategy:
       matrix:
         python-version: ${{ fromJson(needs.build-sdist.outputs.python-versions) }}
-        operating-system: ['ubuntu-latest', 'windows-latest']
+        operating-system: ['ubuntu-24.04', 'windows-latest']
         test-environment: ${{ fromJson(needs.build-sdist.outputs.test-environments) }}
       fail-fast: false
     steps:
@@ -117,7 +117,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Dependencies (Linux)
-        if: matrix.operating-system == 'ubuntu-latest'
+        if: matrix.operating-system == 'ubuntu-24.04'
         run: |
           pip install dist/*.whl -r test-files/test_requirements_${{ matrix.test-environment }}.txt
       - name: Install Dependencies (Windows)
@@ -138,7 +138,7 @@ jobs:
   lint:
     name: Static Analysis
     needs: [build-sdist, build-wheel]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Process Python Version
         id: version
@@ -155,7 +155,7 @@ jobs:
           path: dist
       - uses: actions/download-artifact@v4
         with:
-          name: ${{ env.WHEEL_ARTIFACT_PREFIX }}-${{ steps.version.outputs.python-version }}-ubuntu-latest
+          name: ${{ env.WHEEL_ARTIFACT_PREFIX }}-${{ steps.version.outputs.python-version }}-ubuntu-24.04
           path: dist
       - name: Install Tools
         run: |
