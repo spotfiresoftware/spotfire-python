@@ -75,7 +75,7 @@ types = [
     "types-seaborn",
 ]
 lint = [
-    "pylint == 4.0.0",
+    "pylint == 4.0.9",
     "mypy == 1.8.0", "spotfire[types]",
     "cython-lint == 0.16.0",
     "cpplint == 2.0.0",
