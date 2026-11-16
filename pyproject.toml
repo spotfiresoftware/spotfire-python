@@ -26,7 +26,7 @@ dependencies = [
     # Package interactions
     "packaging",
     "pip >= 21.2",
-    "setuptools",
+    "setuptools >= 84.1.0",
     "wheel",
 ]
 classifiers = [
