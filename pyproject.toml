@@ -1,7 +1,7 @@
 [build-system]
 requires = [
-    "setuptools >= 40.8",
-    "wheel",
+    "setuptools >= 84.1.0",
+    "wheel >= 0.38.1",
     "Cython >= 3.0.4",
     "numpy >= 2.0.0",
 ]
@@ -25,9 +25,9 @@ dependencies = [
     "tzdata >= 2022.7",
     # Package interactions
     "packaging",
-    "pip >= 21.2",
+    "pip >= 26.2",
     "setuptools >= 84.1.0",
-    "wheel",
+    "wheel >= 0.38.1",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -49,7 +49,7 @@ Homepage = "https://github.com/spotfiresoftware/spotfire-python"
 [project.optional-dependencies]
 # Geographic data support
 geo = [
-    "geopandas",
+    "geopandas >= 1.1.2",
     "shapely >= 2.0.4",
 ]
 # Plotting libraries
@@ -57,7 +57,7 @@ plot-matplotlib = [
     "matplotlib >= 3.8.4",
 ]
 plot-pil = [
-    "pillow >= 10.0.0",
+    "pillow >= 13.0.0",
 ]
 plot-seaborn = [
     "seaborn >= 0.13.2",
