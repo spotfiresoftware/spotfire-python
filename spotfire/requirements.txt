@@ -1,10 +1,11 @@
 numpy >=1.21,<2.0
 pandas >=0.24.0,!=1.0.2,!=1.0.3,< 3.0.0
-pip
+pip >= 26.2; python_version >= "3.10"
+pip; python_version < "3.10"
 python-dateutil
 pytz
 setuptools >= 84.1.0; python_version >= "3.10"
 setuptools; python_version < "3.10"
 six
-wheel
+wheel >= 0.38.1
 packaging

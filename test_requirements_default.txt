@@ -1,8 +1,10 @@
 -r spotfire/requirements.txt
 
 unittest-xml-reporting
-geopandas
+geopandas >= 1.1.2; python_version >= "3.10"
+geopandas; python_version < "3.10"
 matplotlib
-pillow
+pillow >= 13.0.0; python_version >= "3.11"
+pillow; python_version < "3.11"
 seaborn
 shapely
